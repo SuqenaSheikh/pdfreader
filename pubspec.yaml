@@ -70,6 +70,7 @@ flutter:
   assets:
     - assets/svgs/
     - assets/images/
+    - assets/images/bghome.png
 
 
   fonts:

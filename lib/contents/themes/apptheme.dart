@@ -16,16 +16,20 @@ class AppTheme {
         fontWeight: FontWeight.w600,
         letterSpacing: -0.32,
       ),
+      ///Used at languageselect
       titleLarge: TextStyle(
         color: AppColors.textColor,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
         letterSpacing: -0.32,
       ),
+      ///Used at home
+
       titleMedium: TextStyle(
-        color: AppColors.textColor,
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
+        color: AppColors.buttonTextColor,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.32,
       ),
       titleSmall: TextStyle(
         color: AppColors.textColor,
@@ -37,11 +41,11 @@ class AppTheme {
         fontSize: 18,
         fontWeight: FontWeight.w700,
       ),
-
+///used at home
       bodyMedium: TextStyle(
         color: AppColors.textColor,
-        fontSize: 15,
-        fontWeight: FontWeight.w400,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
       ),
       ///Used at splash
       bodySmall: TextStyle(
@@ -60,7 +64,7 @@ class AppTheme {
     ),
     colorScheme: ColorScheme.light(
         primary: AppColors.primaryColor,
-        // onPrimary: AppColors.bottombarTextColor,
+         onPrimary: AppColors.textColor,
         // secondary: AppColors.headingColor,
         onSecondary: AppColors.buttonTextColor,
         tertiary: AppColors.primaryLightColor
@@ -92,8 +96,8 @@ class AppTheme {
       ),
       titleLarge: TextStyle(
         color: AppColors.buttonTextColor,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        fontWeight: FontWeight.w500,
         letterSpacing: -0.32,
       ),
       titleMedium: TextStyle(

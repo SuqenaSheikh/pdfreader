@@ -2,11 +2,12 @@ class Assets{
   ///Images
   static const String icon = 'assets/images/icon.png';
   static const String pdf = 'assets/images/pdf_icon.png';
-  // static const String girlmaditate = 'assets/images/meditate.png';
+  static const String bg = 'assets/images/bghome.png';
+  static const String papers = 'assets/images/papers.png';
+// static const String girlmaditate = 'assets/images/meditate.png';
   // static const String girl = 'assets/images/stressrelief.png';
   // static const String girl1 = 'assets/images/selfcare.png';
   // static const String girl2 = 'assets/images/breath.png';
-  // static const String boy = 'assets/images/boystanding.png';
   //
   // static const String AppIcon = 'assets/images/iconlauncher.png';
   // // static const String editprofile = 'assets/images/edit1.png';

@@ -111,7 +111,7 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                           lc.t('select_language'),
                           style: Theme.of(
                             context,
-                          ).textTheme.titleLarge?.copyWith(fontSize: 22),
+                          ).textTheme.titleLarge,
                         ),
                         ElevatedButton(
                           onPressed: _selectedCode == null
@@ -159,7 +159,7 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                           size: 24,
                         ),
                         hintText: lc.t('search_language'),
-                        hintStyle: Theme.of(context).textTheme.titleMedium,
+                        hintStyle: Theme.of(context).textTheme.titleLarge,
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.onSecondary,
                         contentPadding: const EdgeInsets.symmetric(
