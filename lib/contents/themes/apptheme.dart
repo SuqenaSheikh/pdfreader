@@ -31,10 +31,12 @@ class AppTheme {
         fontWeight: FontWeight.w600,
         letterSpacing: -0.32,
       ),
+      ///Used at languageselect hint
+
       titleSmall: TextStyle(
         color: AppColors.textColor,
         fontSize: 15,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w500,
       ),
       bodyLarge: TextStyle(
         color: AppColors.buttonTextColor,

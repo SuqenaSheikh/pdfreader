@@ -159,7 +159,7 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                           size: 24,
                         ),
                         hintText: lc.t('search_language'),
-                        hintStyle: Theme.of(context).textTheme.titleLarge,
+                        hintStyle: Theme.of(context).textTheme.titleSmall,
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.onSecondary,
                         contentPadding: const EdgeInsets.symmetric(

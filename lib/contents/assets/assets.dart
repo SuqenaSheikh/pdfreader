@@ -16,8 +16,8 @@ class Assets{
   // // static const String vaccineinj = 'assets/images/inj.png';
   // // static const String healthplus = 'assets/images/pluspaw.png';
   // ///Svgs
-  // static const String lotus = 'assets/svgs/lotus.svg';
-  // static const String lotus2 = 'assets/svgs/lotus2.svg';
+   static const String fileEdit = 'assets/svgs/file-edit.svg';
+   static const String search = 'assets/svgs/search.svg';
   // static const String refresh = 'assets/svgs/refresh.svg';
   // static const String checkfilled = 'assets/svgs/checked.svg';
   // static const String outlined = 'assets/svgs/outline.svg';

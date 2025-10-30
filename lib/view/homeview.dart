@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:pdfread/view/pdfview.dart';
 import '../contents/assets/assets.dart';
@@ -53,14 +55,32 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
+      builder: (_) => Container(
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height * 0.45,
+       decoration: BoxDecoration(
+         color: Theme.of(context).colorScheme.onSecondary,
+         borderRadius: const BorderRadius.vertical(top: Radius.circular(10), ),
+       ),
+       // padding: const EdgeInsets.symmetric(vertical: 10),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          //mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              "Upload your PDF",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                    onPressed: () {
+                      Get.back();
+                    },
+                    icon: const Icon(Icons.clear)
+                )
+              ]
+            ),
+            Image.asset(Assets.papers),
+             Text(
+              "Upload Your PDF Document",
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -69,12 +89,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 _pickAndOpenPDF();
               },
               icon: const Icon(Icons.file_upload),
-              label: const Text("Browse Files"),
+              label: const Text("Upload Pdf"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
+                  horizontal: 40,
                   vertical: 14,
                 ),
                 shape: RoundedRectangleBorder(
@@ -123,9 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     "PDF Reader",
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  Icon(
-                    Icons.search,
-                    color: Theme.of(context).colorScheme.onPrimary,
+                  SvgPicture.asset(
+                    Assets.search,
                   ),
                 ],
               ),
