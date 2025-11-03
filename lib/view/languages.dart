@@ -119,14 +119,13 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                               : () async {
                             await _localeController.changeLocale(_selectedCode!);
 
-                            // final isFirstTime = await AppStartService.isFirstLaunch();
-                            // if (isFirstTime) {
-                            //   await AppStartService.setLaunched();
-                            //   Get.off(()=>PDFReaderHome);
-                            // } else {
-                            //   Get.back(); // if from settings
-                            // }
-                            Get.off(()=>HomeScreen());
+                            final isFirstTime = await AppStartService.isFirstLaunch();
+                            if (isFirstTime) {
+                              await AppStartService.setLaunched();
+                              Get.off(()=>HomeScreen());
+                            } else {
+                              Get.back(); // if from settings
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.primary,

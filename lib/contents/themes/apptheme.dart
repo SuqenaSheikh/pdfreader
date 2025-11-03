@@ -38,10 +38,11 @@ class AppTheme {
         fontSize: 15,
         fontWeight: FontWeight.w500,
       ),
+      ///Used as title in popups
       bodyLarge: TextStyle(
-        color: AppColors.buttonTextColor,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
+        color: AppColors.textColor,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
       ),
 ///used at home
       bodyMedium: TextStyle(

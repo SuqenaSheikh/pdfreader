@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
 // ---------------- main screen ----------------
 class PDFViewerScreen extends StatefulWidget {
@@ -54,6 +55,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // temporary mode flag: after closing sheet for text, we enable placement until the user adds a text overlay
   bool _awaitingTextPlacement = false;
+
   // selected text config from bottom sheet
   double _selectedFontSize = 18;
   bool _selectedBold = false;
@@ -95,7 +97,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
     final viewerWidth = box?.size.width ?? 300.0;
     final pageSize =
-    _pageSizes[(pageNumber - 1).clamp(0, _pageSizes.length - 1)];
+        _pageSizes[(pageNumber - 1).clamp(0, _pageSizes.length - 1)];
     final base = viewerWidth / pageSize.width;
     return base * _controller.zoomLevel;
   }
@@ -217,9 +219,12 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _awaitingTextPlacement = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'Tap on PDF to add text (then drag to position). Save to embed.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
           ),
         ),
       );
@@ -358,10 +363,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   //   }
   // }
   Future<ui.Image> _imageFromPixels(
-      Uint8List rgbaPixels,
-      int width,
-      int height,
-      ) async {
+    Uint8List rgbaPixels,
+    int width,
+    int height,
+  ) async {
     final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(
       rgbaPixels,
     );
@@ -538,14 +543,14 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   void _updateImagePosition(int index, Offset newPageOffset) {
     setState(
-          () => _images[index] = _images[index].copyWith(pageOffset: newPageOffset),
+      () => _images[index] = _images[index].copyWith(pageOffset: newPageOffset),
     );
   }
 
   void _updateImageSize(int index, double w, double h) {
     setState(
-          () =>
-      _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h),
+      () =>
+          _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h),
     );
   }
 
@@ -658,11 +663,71 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       final newBytes = await document.save();
       document.dispose();
 
-      // Store new file
-      final appDoc = await getApplicationDocumentsDirectory();
-      final outFile = File(
-        '${appDoc.path}/${DateTime.now().millisecondsSinceEpoch}_${widget.name}',
-      );
+      // Build output name: originalName (by pdf read).pdf
+      final original = widget.name;
+      final dot = original.lastIndexOf('.');
+      final base = dot > 0 ? original.substring(0, dot) : original;
+      final ext = dot > 0 ? original.substring(dot) : '.pdf';
+      final outName = '$base (by pdf read)$ext';
+
+      // Try to save into public Downloads if available (Android), otherwise app docs
+      String? downloadsPath;
+      try {
+        if (Platform.isAndroid) {
+          final candidate = Directory('/storage/emulated/0/Download');
+          if (await candidate.exists()) downloadsPath = candidate.path;
+        }
+      } catch (_) {}
+
+      Directory targetDir;
+      if (downloadsPath != null) {
+        var granted = true;
+        try {
+          if (Platform.isAndroid) {
+            var status = await Permission.storage.request();
+            if (!status.isGranted) {
+              // Try special access for Android 11+
+              status = await Permission.manageExternalStorage.request();
+            }
+            granted = status.isGranted;
+            if (!granted && status.isPermanentlyDenied) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Please grant storage access in Settings',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                    ),
+                  ),
+                );
+              }
+              await openAppSettings();
+            }
+          }
+        } catch (_) {}
+        if (granted) {
+          targetDir = Directory(downloadsPath);
+        } else {
+          targetDir = await getApplicationDocumentsDirectory();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Storage permission denied. Saved in app folder.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                ),
+              ),
+            );
+          }
+        }
+      } else {
+        targetDir = await getApplicationDocumentsDirectory();
+      }
+      final outFile = File('${targetDir.path}/$outName');
       await outFile.writeAsBytes(newBytes);
 
       // Clear overlays (flattened now)
@@ -673,10 +738,16 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       });
 
       // Notify and reload viewer
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Saved to ${outFile.path}')));
-      print('Saved to ${outFile.path}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Saved to ${outFile.path}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+          ),
+        ),
+      );
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -688,9 +759,16 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       }
     } catch (e, st) {
       debugPrint('Save error: $e\n$st');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to save PDF')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to save PDF',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+          ),
+        ),
+      );
     }
   }
 
@@ -764,7 +842,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         child: TextField(
                           controller: _searchController,
                           style: Theme.of(context).textTheme.titleSmall,
-                          decoration:  InputDecoration(
+                          decoration: InputDecoration(
                             hintText: 'Search in document...',
                             hintStyle: Theme.of(context).textTheme.titleSmall,
                             border: InputBorder.none,
@@ -855,7 +933,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     );
   }
 
-// (keep your other helper widgets & classes below unchanged)
+  // (keep your other helper widgets & classes below unchanged)
 }
 
 // ---------------- Edit bottom sheet widget ----------------
@@ -897,6 +975,12 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     _fontSize = widget.initialFontSize;
     _bold = widget.initialBold;
     _italic = widget.initialItalic;
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _doneAsText() {
@@ -1019,6 +1103,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                                 setState(() => _bold = v ?? false),
                           ),
                         ),
+                        SizedBox(width: 30),
                         Expanded(
                           child: CheckboxListTile(
                             dense: true,
@@ -1031,11 +1116,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         ),
                       ],
                     ),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: _doneAsText,
-                      child: const Text('Done'),
-                    ),
+
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -1053,8 +1134,12 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                       label: const Text('Upload Signature'),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'After uploading you can drag signature on the PDF and Save.',
+                    Center(
+                      child: Text(
+                        textAlign: TextAlign.center,
+                        'Sign on white blank paper. After uploading you can drag signature on the PDF and Save.',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
                     const Spacer(),
                   ],

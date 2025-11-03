@@ -7,6 +7,10 @@ import 'package:pdfread/view/pdfview.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
 import '../contents/themes/app_colors.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import 'package:printing/printing.dart';
+import 'package:path/path.dart' as p;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,11 +63,11 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => Container(
         width: double.infinity,
         height: MediaQuery.of(context).size.height * 0.45,
-       decoration: BoxDecoration(
-         color: Theme.of(context).colorScheme.onSecondary,
-         borderRadius: const BorderRadius.vertical(top: Radius.circular(10), ),
-       ),
-       // padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSecondary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        ),
+        // padding: const EdgeInsets.symmetric(vertical: 10),
         child: Column(
           //mainAxisSize: MainAxisSize.min,
           children: [
@@ -71,15 +75,15 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                    onPressed: () {
-                      Get.back();
-                    },
-                    icon: const Icon(Icons.clear)
-                )
-              ]
+                  onPressed: () {
+                    Get.back();
+                  },
+                  icon: const Icon(Icons.clear),
+                ),
+              ],
             ),
             Image.asset(Assets.papers),
-             Text(
+            Text(
               "Upload Your PDF Document",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -144,9 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     "PDF Reader",
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  SvgPicture.asset(
-                    Assets.search,
-                  ),
+                  SvgPicture.asset(Assets.search),
                 ],
               ),
             ),
@@ -218,7 +220,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Center(
                         child: Text(
                           "No recent files yet.",
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textColor),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: AppColors.textColor),
                         ),
                       )
                     : ListView.builder(
@@ -243,7 +246,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _formatTime(pdf['time']!),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              trailing: Icon(Icons.more_vert),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.more_vert),
+                                onPressed: () => _showFileOptions(pdf),
+                              ),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -265,5 +271,217 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  void _showFileOptions(Map<String, String> pdf) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            ListTile(
+              leading: Image.asset(Assets.pdf, height: 40),
+              title: Text(
+                pdf['name'] ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              subtitle: Text(
+                _formatTime(pdf['time']!),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              onTap: () {},
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.print,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Print',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _printPdf(pdf['path']!);
+              },
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: Color(0xffBDBDBD)),
+            ),
+
+            ListTile(
+              leading: Icon(
+                Icons.drive_file_rename_outline,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Rename',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _renamePdf(pdf);
+              },
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: Color(0xffBDBDBD)),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.share,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Share',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _sharePdf(pdf['path']!, pdf['name']!);
+              },
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: Color(0xffBDBDBD)),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.delete,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(
+                'Delete',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await RecentPDFStorage.removeByPath(pdf['path']!);
+                await _loadRecent();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Removed',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _printPdf(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) throw Exception('File not found');
+      await Printing.layoutPdf(onLayout: (_) async => await file.readAsBytes());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Print failed: $e')));
+    }
+  }
+
+  Future<void> _sharePdf(String path, String name) async {
+    try {
+      final file = XFile(path, name: name, mimeType: 'application/pdf');
+      await Share.shareXFiles([file], text: name);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+    }
+  }
+
+  Future<void> _renamePdf(Map<String, String> pdf) async {
+    final oldPath = pdf['path']!;
+    final oldName = pdf['name']!;
+    final controller = TextEditingController(text: _stripExtension(oldName));
+
+    final newBase = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Rename PDF', style: Theme.of(context).textTheme.bodyLarge),
+        content: TextField(
+          controller: controller,
+          style: Theme.of(context).textTheme.titleSmall,
+          decoration: InputDecoration(
+            hintText: 'New name (without .pdf)',
+            hintStyle: Theme.of(context).textTheme.titleSmall,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+
+    if (newBase == null || newBase.isEmpty) return;
+    try {
+      final file = File(oldPath);
+      if (!await file.exists()) throw Exception('File not found');
+      final dir = file.parent.path;
+      final newPath = p.join(dir, '$newBase.pdf');
+      final renamed = await file.rename(newPath);
+      await RecentPDFStorage.updateEntry(
+        oldPath: oldPath,
+        newPath: renamed.path,
+        newName: '$newBase.pdf',
+      );
+      await _loadRecent();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Renamed',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Rename failed: $e')));
+    }
+  }
+
+  String _stripExtension(String name) {
+    final i = name.lastIndexOf('.');
+    return i > 0 ? name.substring(0, i) : name;
   }
 }

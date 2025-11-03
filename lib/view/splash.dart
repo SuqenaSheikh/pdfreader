@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:pdfread/view/homeview.dart';
 import '../contents/assets/assets.dart';
+import '../contents/services/app_start_service.dart';
 import 'home.dart';
 import 'languages.dart';
 
@@ -35,16 +37,16 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // Navigate after animation completes
-    _controller.addStatusListener((status) {
+    _controller.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
-        Get.off(() => SelectLanguageScreen());
-        // final isFirstTime = await AppStartService.isFirstLaunch();
-        //
-        // if (isFirstTime) {
-        //   Get.offAllNamed(AppRoutes.languages);
-        // } else {
-        //   Get.offAllNamed(AppRoutes.moodAnalyzer);
-        // }
+        //Get.off(() => SelectLanguageScreen());
+        final isFirstTime = await AppStartService.isFirstLaunch();
+
+        if (isFirstTime) {
+          Get.offAll(()=>SelectLanguageScreen());
+        } else {
+          Get.offAll(()=>HomeScreen());
+        }
       }
     });
   }
