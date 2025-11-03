@@ -21,6 +21,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, String>> _recentPDFs = [];
+  final TextEditingController _searchController = TextEditingController();
+  bool _showSearch = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -121,6 +124,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final List<Map<String, String>> filtered = _searchQuery.trim().isEmpty
+        ? _recentPDFs
+        : _recentPDFs
+              .where(
+                (e) => (e['name'] ?? '').toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ),
+              )
+              .toList();
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: _showUploadSheet,
@@ -148,11 +160,64 @@ class _HomeScreenState extends State<HomeScreen> {
                     "PDF Reader",
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  SvgPicture.asset(Assets.search),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showSearch = !_showSearch;
+                        if (!_showSearch) {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        }
+                      });
+                    },
+                    child: SvgPicture.asset(Assets.search),
+                  ),
                 ],
               ),
             ),
             SizedBox(height: 10),
+
+            if (_showSearch)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: Theme.of(context).textTheme.titleSmall,
+                          decoration: InputDecoration(
+                            hintText: 'Search recent files...',
+                            hintStyle: Theme.of(context).textTheme.titleSmall,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                          ),
+                          onChanged: (v) => setState(() => _searchQuery = v),
+                          onSubmitted: (v) => setState(() => _searchQuery = v),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          setState(() {
+                            _showSearch = false;
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             ///Container with image and text
             Padding(
@@ -216,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: _recentPDFs.isEmpty
+                child: filtered.isEmpty
                     ? Center(
                         child: Text(
                           "No recent files yet.",
@@ -225,9 +290,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     : ListView.builder(
-                        itemCount: _recentPDFs.length,
+                        itemCount: filtered.length,
                         itemBuilder: (context, index) {
-                          final pdf = _recentPDFs[index];
+                          final pdf = filtered[index];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(
