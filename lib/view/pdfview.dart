@@ -54,6 +54,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // temporary mode flag: after closing sheet for text, we enable placement until the user adds a text overlay
   bool _awaitingTextPlacement = false;
+  // selected text config from bottom sheet
+  double _selectedFontSize = 18;
+  bool _selectedBold = false;
+  bool _selectedItalic = false;
 
   @override
   void initState() {
@@ -91,7 +95,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
     final viewerWidth = box?.size.width ?? 300.0;
     final pageSize =
-        _pageSizes[(pageNumber - 1).clamp(0, _pageSizes.length - 1)];
+    _pageSizes[(pageNumber - 1).clamp(0, _pageSizes.length - 1)];
     final base = viewerWidth / pageSize.width;
     return base * _controller.zoomLevel;
   }
@@ -181,7 +185,9 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               // initial values passed for convenience
               initialColor: _selectedColor,
               initialBg: _selectedBgColor,
-              initialFontSize: 18,
+              initialFontSize: _selectedFontSize,
+              initialBold: _selectedBold,
+              initialItalic: _selectedItalic,
             ),
           ),
         );
@@ -204,6 +210,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _selectedTool = 'text';
         _selectedColor = result['color'] as Color? ?? Colors.black;
         _selectedBgColor = result['bg'] as Color? ?? Colors.transparent;
+        _selectedFontSize =
+            (result['fontSize'] as double?) ?? _selectedFontSize;
+        _selectedBold = (result['bold'] as bool?) ?? false;
+        _selectedItalic = (result['italic'] as bool?) ?? false;
         _awaitingTextPlacement = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,13 +260,17 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         Uri.parse('https://api.remove.bg/v1.0/removebg'),
       );
       request.headers['X-Api-Key'] = apiKey;
-      request.files.add(http.MultipartFile.fromBytes(
-        'image_file',
-        rawBytes,
-        filename: 'signature.jpg',
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image_file',
+          rawBytes,
+          filename: 'signature.jpg',
+        ),
+      );
 
-      final response = await request.send().timeout(const Duration(seconds: 15));
+      final response = await request.send().timeout(
+        const Duration(seconds: 15),
+      );
       if (response.statusCode == 200) {
         final bytes = await response.stream.toBytes();
         return bytes;
@@ -269,6 +283,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
     return rawBytes; // worst case – return original
   }
+
   Future<Uint8List?> _removeWhiteBackgroundLocal(Uint8List inputBytes) async {
     try {
       final codec = await ui.instantiateImageCodec(inputBytes);
@@ -285,7 +300,9 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
       for (int i = 0; i < pixels.length; i += 4) {
         final r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-        if (r >= threshold && g >= threshold && b >= threshold &&
+        if (r >= threshold &&
+            g >= threshold &&
+            b >= threshold &&
             (r - threshold).abs() <= tolerance &&
             (g - threshold).abs() <= tolerance &&
             (b - threshold).abs() <= tolerance) {
@@ -306,6 +323,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       return null;
     }
   }
+
   // Future<Uint8List?> _removeWhiteBackground(
   //     Uint8List inputBytes, {
   //       int threshold = 200,
@@ -340,10 +358,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   //   }
   // }
   Future<ui.Image> _imageFromPixels(
-    Uint8List rgbaPixels,
-    int width,
-    int height,
-  ) async {
+      Uint8List rgbaPixels,
+      int width,
+      int height,
+      ) async {
     final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(
       rgbaPixels,
     );
@@ -381,7 +399,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final imgW = fi.image.width.toDouble();
     final imgH = fi.image.height.toDouble();
 
-    final pageW = _pageSizes[(hit.page - 1).clamp(0, _pageSizes.length - 1)].width;
+    final pageW =
+        _pageSizes[(hit.page - 1).clamp(0, _pageSizes.length - 1)].width;
     final targetW = pageW * 0.4;
     final targetH = targetW * (imgH / imgW);
 
@@ -398,6 +417,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
     setState(() => _images.add(overlay));
   }
+
   Future<Offset> _viewerCenterOffset() async {
     await Future.delayed(Duration.zero);
     final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
@@ -452,9 +472,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   Future<void> _showAddTextDialog(Offset pos) async {
     final TextEditingController tc = TextEditingController();
-    String fontSize = '18';
-    bool bold = false;
-    bool italic = false;
 
     await showDialog(
       context: context,
@@ -472,24 +489,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   hintStyle: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Text('Size:'),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      onChanged: (v) => fontSize = v,
-                      keyboardType: TextInputType.number,
-                      style: Theme.of(context).textTheme.titleSmall,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 18',
-                        hintStyle: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
           actions: [
@@ -501,7 +500,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               onPressed: () async {
                 final text = tc.text.trim();
                 if (text.isEmpty) return;
-                final size = double.tryParse(fontSize) ?? 18.0;
                 if (_pageSizes.isEmpty) {
                   await _loadPageSizes();
                 }
@@ -510,7 +508,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   pageNumber: hit.page,
                   text: text,
                   color: _selectedColor,
-                  fontSize: size,
+                  fontSize: _selectedFontSize,
+                  backgroundColor: _selectedBgColor,
+                  bold: _selectedBold,
+                  italic: _selectedItalic,
                   pageOffset: hit.pagePoint,
                 );
                 setState(() => _texts.add(overlay));
@@ -537,14 +538,14 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   void _updateImagePosition(int index, Offset newPageOffset) {
     setState(
-      () => _images[index] = _images[index].copyWith(pageOffset: newPageOffset),
+          () => _images[index] = _images[index].copyWith(pageOffset: newPageOffset),
     );
   }
 
   void _updateImageSize(int index, double w, double h) {
     setState(
-      () =>
-          _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h),
+          () =>
+      _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h),
     );
   }
 
@@ -600,7 +601,29 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         final page = document.pages[pageIndex];
         final pdfX = t.pageOffset.dx;
         final pdfY = t.pageOffset.dy;
-        final font = PdfStandardFont(PdfFontFamily.helvetica, t.fontSize);
+        final PdfFontStyle style = t.bold
+            ? PdfFontStyle.bold
+            : (t.italic ? PdfFontStyle.italic : PdfFontStyle.regular);
+        final font = PdfStandardFont(
+          PdfFontFamily.helvetica,
+          t.fontSize,
+          style: style,
+        );
+        // draw background if needed
+        if (t.backgroundColor.opacity > 0) {
+          final size = font.measureString(t.text);
+          page.graphics.drawRectangle(
+            bounds: Rect.fromLTWH(pdfX, pdfY, size.width, size.height),
+            pen: PdfPen(PdfColor(0, 0, 0, 0)),
+            brush: PdfSolidBrush(
+              PdfColor(
+                t.backgroundColor.red,
+                t.backgroundColor.green,
+                t.backgroundColor.blue,
+              ),
+            ),
+          );
+        }
         final brush = PdfSolidBrush(
           PdfColor(t.color.red, t.color.green, t.color.blue),
         );
@@ -632,7 +655,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       }
 
       // Save the modified document
-      final newBytes = document.save();
+      final newBytes = await document.save();
       document.dispose();
 
       // Store new file
@@ -640,7 +663,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       final outFile = File(
         '${appDoc.path}/${DateTime.now().millisecondsSinceEpoch}_${widget.name}',
       );
-      await outFile.writeAsBytes(await newBytes);
+      await outFile.writeAsBytes(newBytes);
 
       // Clear overlays (flattened now)
       setState(() {
@@ -653,6 +676,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Saved to ${outFile.path}')));
+      print('Saved to ${outFile.path}');
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -693,7 +717,9 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         widget.name.length > 12
                             ? '${widget.name.substring(0, 14)}...'
                             : widget.name,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(fontSize: 16),
                       ),
                     ],
                   ),
@@ -737,8 +763,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          decoration: const InputDecoration(
+                          style: Theme.of(context).textTheme.titleSmall,
+                          decoration:  InputDecoration(
                             hintText: 'Search in document...',
+                            hintStyle: Theme.of(context).textTheme.titleSmall,
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: 12,
@@ -827,7 +855,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     );
   }
 
-  // (keep your other helper widgets & classes below unchanged)
+// (keep your other helper widgets & classes below unchanged)
 }
 
 // ---------------- Edit bottom sheet widget ----------------
@@ -835,12 +863,16 @@ class PdfEditSheet extends StatefulWidget {
   final Color initialColor;
   final Color initialBg;
   final double initialFontSize;
+  final bool initialBold;
+  final bool initialItalic;
 
   const PdfEditSheet({
     super.key,
     required this.initialColor,
     required this.initialBg,
     required this.initialFontSize,
+    required this.initialBold,
+    required this.initialItalic,
   });
 
   @override
@@ -853,6 +885,8 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   Color _color = Colors.black;
   Color _bg = Colors.transparent;
   double _fontSize = 18;
+  bool _bold = false;
+  bool _italic = false;
 
   @override
   void initState() {
@@ -861,6 +895,8 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     _color = widget.initialColor;
     _bg = widget.initialBg;
     _fontSize = widget.initialFontSize;
+    _bold = widget.initialBold;
+    _italic = widget.initialItalic;
   }
 
   void _doneAsText() {
@@ -869,6 +905,8 @@ class _PdfEditSheetState extends State<PdfEditSheet>
       'color': _color,
       'bg': _bg,
       'fontSize': _fontSize,
+      'bold': _bold,
+      'italic': _italic,
     });
   }
 
@@ -968,6 +1006,31 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         Text('${_fontSize.toInt()}pt'),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CheckboxListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Bold'),
+                            value: _bold,
+                            onChanged: (v) =>
+                                setState(() => _bold = v ?? false),
+                          ),
+                        ),
+                        Expanded(
+                          child: CheckboxListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Italic'),
+                            value: _italic,
+                            onChanged: (v) =>
+                                setState(() => _italic = v ?? false),
+                          ),
+                        ),
+                      ],
+                    ),
                     const Spacer(),
                     ElevatedButton(
                       onPressed: _doneAsText,
@@ -1048,20 +1111,36 @@ class _TextOverlay {
   final String text;
   final Color color;
   final double fontSize;
+  final Color backgroundColor;
+  final bool bold;
+  final bool italic;
   final Offset pageOffset; // in PDF page points
   _TextOverlay({
     required this.pageNumber,
     required this.text,
     required this.color,
     required this.fontSize,
+    required this.backgroundColor,
+    required this.bold,
+    required this.italic,
     required this.pageOffset,
   });
 
-  _TextOverlay copyWith({Offset? pageOffset}) => _TextOverlay(
+  _TextOverlay copyWith({
+    Offset? pageOffset,
+    double? fontSize,
+    Color? color,
+    Color? backgroundColor,
+    bool? bold,
+    bool? italic,
+  }) => _TextOverlay(
     pageNumber: pageNumber,
     text: text,
-    color: color,
-    fontSize: fontSize,
+    color: color ?? this.color,
+    fontSize: fontSize ?? this.fontSize,
+    backgroundColor: backgroundColor ?? this.backgroundColor,
+    bold: bold ?? this.bold,
+    italic: italic ?? this.italic,
     pageOffset: pageOffset ?? this.pageOffset,
   );
 }
@@ -1120,8 +1199,10 @@ class _DraggableTextState extends State<_DraggableText> {
 
   @override
   Widget build(BuildContext context) {
-    final localOffset =
-    widget.pageToLocal(widget.overlay.pageNumber, widget.overlay.pageOffset);
+    final localOffset = widget.pageToLocal(
+      widget.overlay.pageNumber,
+      widget.overlay.pageOffset,
+    );
     final scale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
 
     return Positioned(
@@ -1136,8 +1217,8 @@ class _DraggableTextState extends State<_DraggableText> {
           // calculate movement delta
           final delta = details.localPosition - _dragStartOffset;
           // convert movement to PDF page coordinates
-          final newPageOffset = _initialPageOffset +
-              Offset(delta.dx / scale, delta.dy / scale);
+          final newPageOffset =
+              _initialPageOffset + Offset(delta.dx / scale, delta.dy / scale);
           widget.onUpdatePageOffset(newPageOffset);
         },
         onLongPress: () {
@@ -1165,12 +1246,18 @@ class _DraggableTextState extends State<_DraggableText> {
         },
         child: Container(
           padding: const EdgeInsets.all(2),
-          color: Colors.transparent,
+          color: widget.overlay.backgroundColor,
           child: Text(
             widget.overlay.text,
             style: TextStyle(
               color: widget.overlay.color,
               fontSize: widget.overlay.fontSize * scale,
+              fontWeight: widget.overlay.bold
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+              fontStyle: widget.overlay.italic
+                  ? FontStyle.italic
+                  : FontStyle.normal,
             ),
           ),
         ),
@@ -1178,8 +1265,6 @@ class _DraggableTextState extends State<_DraggableText> {
     );
   }
 }
-
-
 
 class _HighlightWidget extends StatelessWidget {
   final _HighlightOverlay overlay;
