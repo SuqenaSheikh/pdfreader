@@ -30,7 +30,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final GlobalKey _pdfViewerInternalKey = GlobalKey();
 
-  // UI state
+  // UI stat
   bool _showSearchBar = false;
   String _selectedTool =
       ''; // '', 'text', 'signature'  (highlight left to selection menu)
