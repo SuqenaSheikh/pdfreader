@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdfread/view/pdfview.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
+import '../contents/themes/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -217,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Center(
                         child: Text(
                           "No recent files yet.",
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textColor),
                         ),
                       )
                     : ListView.builder(

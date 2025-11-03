@@ -4,13 +4,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
+import 'package:http/http.dart' as http;
 
 // ---------------- main screen ----------------
 class PDFViewerScreen extends StatefulWidget {
@@ -28,7 +28,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey _viewerKey = GlobalKey();
   final ImagePicker _imagePicker = ImagePicker();
-  final GlobalKey _pdfViewerInternalKey = GlobalKey();
 
   // UI stat
   bool _showSearchBar = false;
@@ -207,7 +206,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _selectedBgColor = result['bg'] as Color? ?? Colors.transparent;
         _awaitingTextPlacement = true;
       });
-      // instruct user (optional): user will tap PDF to add text
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -232,41 +230,115 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   }
 
   // ---------------- signature pick ----------------
-  Future<Uint8List?> _removeWhiteBackground(
-    Uint8List inputBytes, {
-    int threshold = 245,
-  }) async {
+  // Tries local pixel-threshold first (fast, no network).
+  /// If it fails (less than 5% of pixels made transparent), falls back to remove.bg API.
+  Future<Uint8List?> _removeSignatureBackground(Uint8List rawBytes) async {
+    // 1. Try cheap local method
+    final local = await _removeWhiteBackgroundLocal(rawBytes);
+    if (local != null) return local;
+
+    // 2. Fallback: remove.bg (you need a free API key from https://remove.bg)
+    const apiKey = 'PES9omQWNJcs5rnL7YXv547w'; // <-- put your key here
+    if (apiKey.startsWith('YOUR_')) {
+      debugPrint('Warning: remove.bg API key not set – background not removed');
+      return rawBytes;
+    }
+
     try {
-      final ui.Codec codec = await ui.instantiateImageCodec(inputBytes);
-      final ui.FrameInfo fi = await codec.getNextFrame();
-      final ui.Image img = fi.image;
-      final ByteData? bd = await img.toByteData(
-        format: ui.ImageByteFormat.rawRgba,
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://api.remove.bg/v1.0/removebg'),
       );
-      if (bd == null) return inputBytes;
-      final Uint8List pixels = bd.buffer.asUint8List();
+      request.headers['X-Api-Key'] = apiKey;
+      request.files.add(http.MultipartFile.fromBytes(
+        'image_file',
+        rawBytes,
+        filename: 'signature.jpg',
+      ));
+
+      final response = await request.send().timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final bytes = await response.stream.toBytes();
+        return bytes;
+      } else {
+        debugPrint('remove.bg error ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('remove.bg exception: $e');
+    }
+
+    return rawBytes; // worst case – return original
+  }
+  Future<Uint8List?> _removeWhiteBackgroundLocal(Uint8List inputBytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(inputBytes);
+      final frame = await codec.getNextFrame();
+      final img = frame.image;
+
+      final bd = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (bd == null) return null;
+
+      final pixels = bd.buffer.asUint8List();
+      int transparentCount = 0;
+      const threshold = 220;
+      const tolerance = 40;
+
       for (int i = 0; i < pixels.length; i += 4) {
-        final r = pixels[i];
-        final g = pixels[i + 1];
-        final b = pixels[i + 2];
-        if (r >= threshold && g >= threshold && b >= threshold) {
+        final r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+        if (r >= threshold && g >= threshold && b >= threshold &&
+            (r - threshold).abs() <= tolerance &&
+            (g - threshold).abs() <= tolerance &&
+            (b - threshold).abs() <= tolerance) {
           pixels[i + 3] = 0;
+          transparentCount++;
         }
       }
-      final ui.Image outImage = await _imageFromPixels(
-        pixels,
-        img.width,
-        img.height,
-      );
-      final ByteData? png = await outImage.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+
+      // Heuristic: if <5% became transparent → probably failed
+      if (transparentCount < (pixels.length ~/ 4) * 0.05) {
+        return null; // signal fallback
+      }
+
+      final outImg = await _imageFromPixels(pixels, img.width, img.height);
+      final png = await outImg.toByteData(format: ui.ImageByteFormat.png);
       return png?.buffer.asUint8List();
     } catch (_) {
-      return inputBytes;
+      return null;
     }
   }
-
+  // Future<Uint8List?> _removeWhiteBackground(
+  //     Uint8List inputBytes, {
+  //       int threshold = 200,
+  //       int tolerance = 55,
+  //     }) async {
+  //   try {
+  //     final ui.Codec codec = await ui.instantiateImageCodec(inputBytes);
+  //     final ui.FrameInfo fi = await codec.getNextFrame();
+  //     final ui.Image img = fi.image;
+  //     final ByteData? bd = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+  //     if (bd == null) return inputBytes;
+  //
+  //     final Uint8List pixels = bd.buffer.asUint8List();
+  //     for (int i = 0; i < pixels.length; i += 4) {
+  //       final r = pixels[i];
+  //       final g = pixels[i + 1];
+  //       final b = pixels[i + 2];
+  //
+  //       if (r >= threshold && g >= threshold && b >= threshold &&
+  //           (r - threshold).abs() <= tolerance &&
+  //           (g - threshold).abs() <= tolerance &&
+  //           (b - threshold).abs() <= tolerance) {
+  //         pixels[i + 3] = 0; // transparent
+  //       }
+  //     }
+  //
+  //     final ui.Image out = await _imageFromPixels(pixels, img.width, img.height);
+  //     final ByteData? png = await out.toByteData(format: ui.ImageByteFormat.png);
+  //     return png?.buffer.asUint8List();
+  //   } catch (_) {
+  //     return inputBytes;
+  //   }
+  // }
   Future<ui.Image> _imageFromPixels(
     Uint8List rgbaPixels,
     int width,
@@ -287,25 +359,32 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   }
 
   Future<void> _pickSignatureImage() async {
-    // allow both gallery and camera selection (simple approach - open gallery by default)
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.camera,
+      // optional: force JPEG to reduce size
+      imageQuality: 85,
     );
     if (xfile == null) return;
+
     final raw = await File(xfile.path).readAsBytes();
-    final cleaned = await _removeWhiteBackground(raw) ?? raw;
+
+    // This now uses local → remove.bg fallback
+    final cleaned = await _removeSignatureBackground(raw) ?? raw;
+
+    // … rest of your code unchanged …
     final center = await _viewerCenterOffset();
     if (_pageSizes.isEmpty) await _loadPageSizes();
     final hit = _localToPage(center);
-    // default width: 40% of page width, keep aspect ratio
-    final ui.Codec codec = await ui.instantiateImageCodec(cleaned);
-    final ui.FrameInfo fi = await codec.getNextFrame();
+
+    final codec = await ui.instantiateImageCodec(cleaned);
+    final fi = await codec.getNextFrame();
     final imgW = fi.image.width.toDouble();
     final imgH = fi.image.height.toDouble();
-    final pageW =
-        _pageSizes[(hit.page - 1).clamp(0, _pageSizes.length - 1)].width;
+
+    final pageW = _pageSizes[(hit.page - 1).clamp(0, _pageSizes.length - 1)].width;
     final targetW = pageW * 0.4;
     final targetH = targetW * (imgH / imgW);
+
     final overlay = _ImageOverlay(
       bytes: cleaned,
       pageNumber: hit.page,
@@ -316,9 +395,9 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       pageWidth: targetW,
       pageHeight: targetH,
     );
+
     setState(() => _images.add(overlay));
   }
-
   Future<Offset> _viewerCenterOffset() async {
     await Future.delayed(Duration.zero);
     final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
@@ -339,38 +418,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     _lastSelectionGlobalRect = details.globalSelectedRegion;
     _lastSelectedPageNumber ??= 1;
     // NOTE: we intentionally do NOT auto-apply highlight here — keep selection menu behavior.
-  }
-
-  Future<void> _applyHighlightFromSelection() async {
-    if (_lastSelectionGlobalRect == null || _lastSelectedPageNumber == null) return;
-
-    final localRect = await _globalRectToLocal(_lastSelectionGlobalRect!);
-    if (localRect == null) return;
-
-    final hit = _localToPage(localRect.center);
-    final pageSize = _pageSizes[hit.page - 1];
-    final scale = _effectiveScaleForPage(hit.page);
-
-    final pdfRect = Rect.fromLTWH(
-      localRect.left / scale,
-      localRect.top / scale,
-      localRect.width / scale,
-      localRect.height / scale,
-    );
-
-    final overlay = _HighlightOverlay(
-      pageNumber: hit.page,
-      rect: pdfRect,
-      color: _selectedColor.withOpacity(_opacity),
-    );
-
-    setState(() {
-      _highlights.add(overlay);
-      _controller.clearSelection();
-      _lastSelectedText = null;
-      _lastSelectionGlobalRect = null;
-      _lastSelectedPageNumber = null;
-    });
   }
 
   // ---------------- convert global rect to viewer local ----------------
@@ -419,7 +466,11 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
             children: [
               TextField(
                 controller: tc,
-                decoration: const InputDecoration(hintText: 'Type text'),
+                style: Theme.of(context).textTheme.titleSmall,
+                decoration: InputDecoration(
+                  hintText: 'Type text',
+                  hintStyle: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -430,29 +481,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                     child: TextField(
                       onChanged: (v) => fontSize = v,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(hintText: 'e.g. 18'),
+                      style: Theme.of(context).textTheme.titleSmall,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 18',
+                        hintStyle: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Checkbox(
-                    value: bold,
-                    onChanged: (v) {
-                      bold = v ?? false;
-                    },
-                  ),
-                  const Text('B'),
-                  const SizedBox(width: 12),
-                  Checkbox(
-                    value: italic,
-                    onChanged: (v) {
-                      italic = v ?? false;
-                    },
-                  ),
-                  const Text('I'),
                 ],
               ),
             ],
@@ -499,12 +534,18 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   void _removeText(int index) {
     setState(() => _texts.removeAt(index));
   }
+
   void _updateImagePosition(int index, Offset newPageOffset) {
-    setState(() => _images[index] = _images[index].copyWith(pageOffset: newPageOffset));
+    setState(
+      () => _images[index] = _images[index].copyWith(pageOffset: newPageOffset),
+    );
   }
 
   void _updateImageSize(int index, double w, double h) {
-    setState(() => _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h));
+    setState(
+      () =>
+          _images[index] = _images[index].copyWith(pageWidth: w, pageHeight: h),
+    );
   }
 
   void _removeImage(int index) {
@@ -524,6 +565,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
       final viewerSize = box?.size ?? const Size(300, 400);
 
+      // Apply highlights
       for (final h in _highlights) {
         final pageIndex = (h.pageNumber - 1).clamp(0, document.pages.count - 1);
         final page = document.pages[pageIndex];
@@ -552,6 +594,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         );
       }
 
+      // Apply text overlays
       for (final t in _texts) {
         final pageIndex = (t.pageNumber - 1).clamp(0, document.pages.count - 1);
         final page = document.pages[pageIndex];
@@ -569,64 +612,61 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         );
       }
 
+      // Apply images (signatures)
       for (final im in _images) {
         final pageIndex = (im.pageNumber - 1).clamp(
           0,
           document.pages.count - 1,
         );
         final page = document.pages[pageIndex];
-        final pdfX = im.pageOffset.dx;
-        final pdfY = im.pageOffset.dy;
-        final pdfW = im.pageWidth;
-        final pdfH = im.pageHeight;
         final PdfBitmap bitmap = PdfBitmap(im.bytes);
-        page.graphics.drawImage(bitmap, Rect.fromLTWH(pdfX, pdfY, pdfW, pdfH));
+        page.graphics.drawImage(
+          bitmap,
+          Rect.fromLTWH(
+            im.pageOffset.dx,
+            im.pageOffset.dy,
+            im.pageWidth,
+            im.pageHeight,
+          ),
+        );
       }
 
+      // Save the modified document
       final newBytes = document.save();
       document.dispose();
 
+      // Store new file
       final appDoc = await getApplicationDocumentsDirectory();
       final outFile = File(
         '${appDoc.path}/${DateTime.now().millisecondsSinceEpoch}_${widget.name}',
       );
       await outFile.writeAsBytes(await newBytes);
 
-      // Optionally: replace current viewer with saved file so overlays are flattened and won't move.
+      // Clear overlays (flattened now)
       setState(() {
-        // clear in-memory overlays because we've flattened them
         _highlights.clear();
         _texts.clear();
         _images.clear();
       });
 
+      // Notify and reload viewer
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Saved to ${outFile.path}')));
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                PDFViewerScreen(path: outFile.path, name: widget.name),
+          ),
+        );
+      }
     } catch (e, st) {
       debugPrint('Save error: $e\n$st');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Failed to save PDF')));
-    }
-  }
-
-  // ---------------- pick PDF replacement ----------------
-  Future<void> _pickAndOpenPdfFromHome() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-    );
-    if (result != null && result.files.single.path != null) {
-      final path = result.files.single.path!;
-      final name = result.files.single.name;
-      RecentPDFStorage.addPDF(path, name);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PDFViewerScreen(path: path, name: name),
-        ),
-      );
     }
   }
 
@@ -653,7 +693,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         widget.name.length > 12
                             ? '${widget.name.substring(0, 14)}...'
                             : widget.name,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16),
                       ),
                     ],
                   ),
@@ -715,73 +755,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   ),
                 ),
               ),
-
-            // viewer + overlays
-            // Expanded(
-            //   child: Padding(
-            //     padding: const EdgeInsets.only(top: 8, left: 7, right: 7),
-            //     child: GestureDetector(
-            //       onTapUp: _onViewerTap,
-            //       child: Stack(
-            //         children: [
-            //           Positioned.fill(
-            //             child: Container(
-            //               key: _viewerKey,
-            //               color: Colors.white,
-            //               child: SfPdfViewer.file(
-            //                 File(widget.path),
-            //                 controller: _controller,
-            //                 onTextSelectionChanged: _onTextSelectionChanged,
-            //                 enableTextSelection: true,
-            //                 canShowTextSelectionMenu: true,
-            //                 pageSpacing: _pageSpacing,
-            //                 onDocumentLoaded: (_) => _loadPageSizes(),
-            //               ),
-            //             ),
-            //           ),
-            //
-            //           // highlights (visual-only until saved)
-            //           for (int i = 0; i < _highlights.length; i++)
-            //             Positioned(
-            //               left: _highlights[i].rect.left,
-            //               top: _highlights[i].rect.top,
-            //               width: _highlights[i].rect.width,
-            //               height: _highlights[i].rect.height,
-            //               child: GestureDetector(
-            //                 onLongPress: () => _removeHighlight(i),
-            //                 child: Container(color: _highlights[i].color),
-            //               ),
-            //             ),
-            //
-            //           // text overlays (draggable)
-            //           for (int i = 0; i < _texts.length; i++)
-            //             _DraggableText(
-            //               overlay: _texts[i],
-            //               pageToLocal: (page, pt) => _pageToLocal(page, pt),
-            //               effectiveScaleForPage: (page) =>
-            //                   _effectiveScaleForPage(page),
-            //               onUpdatePageOffset: (newPageOffset) =>
-            //                   _updateTextPosition(i, newPageOffset),
-            //               onDelete: () => _removeText(i),
-            //             ),
-            //
-            //           // image overlays (signatures)
-            //           for (int i = 0; i < _images.length; i++)
-            //             _DraggableImage(
-            //               overlay: _images[i],
-            //               pageToLocal: (page, pt) => _pageToLocal(page, pt),
-            //               effectiveScaleForPage: (page) =>
-            //                   _effectiveScaleForPage(page),
-            //               onUpdatePageOffset: (newPageOffset) =>
-            //                   _updateImagePosition(i, newPageOffset),
-            //               onDelete: () => _removeImage(i),
-            //             ),
-            //         ],
-            //       ),
-            //     ),
-            //   ),
-            // ),
-            // ----- replace the whole “viewer + overlays” block -----
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 8, left: 7, right: 7),
@@ -1062,6 +1035,7 @@ class _HighlightOverlay {
   final int pageNumber;
   final Rect rect;
   final Color color;
+
   _HighlightOverlay({
     required this.pageNumber,
     required this.rect,
@@ -1082,6 +1056,7 @@ class _TextOverlay {
     required this.fontSize,
     required this.pageOffset,
   });
+
   _TextOverlay copyWith({Offset? pageOffset}) => _TextOverlay(
     pageNumber: pageNumber,
     text: text,
@@ -1094,9 +1069,9 @@ class _TextOverlay {
 class _ImageOverlay {
   final Uint8List bytes;
   final int pageNumber;
-  final Offset pageOffset;      // top‑left in PDF points
-  double pageWidth;            // mutable
-  double pageHeight;           // mutable
+  final Offset pageOffset; // top‑left in PDF points
+  double pageWidth; // mutable
+  double pageHeight; // mutable
 
   _ImageOverlay({
     required this.bytes,
@@ -1118,41 +1093,84 @@ class _ImageOverlay {
     pageHeight: pageHeight ?? this.pageHeight,
   );
 }
-class _DraggableText extends StatelessWidget {
+
+class _DraggableText extends StatefulWidget {
   final _TextOverlay overlay;
   final Offset Function(int page, Offset pagePoint) pageToLocal;
   final double Function(int page) effectiveScaleForPage;
-  final void Function(Offset newPageOffset) onUpdatePageOffset;
+  final ValueChanged<Offset> onUpdatePageOffset;
   final VoidCallback onDelete;
+
   const _DraggableText({
     required this.overlay,
     required this.pageToLocal,
     required this.effectiveScaleForPage,
     required this.onUpdatePageOffset,
     required this.onDelete,
-  });
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<_DraggableText> createState() => _DraggableTextState();
+}
+
+class _DraggableTextState extends State<_DraggableText> {
+  Offset _dragStartOffset = Offset.zero;
+  Offset _initialPageOffset = Offset.zero;
 
   @override
   Widget build(BuildContext context) {
-    final local = pageToLocal(overlay.pageNumber, overlay.pageOffset);
-    final scale = effectiveScaleForPage(overlay.pageNumber);
+    final localOffset =
+    widget.pageToLocal(widget.overlay.pageNumber, widget.overlay.pageOffset);
+    final scale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
+
     return Positioned(
-      left: local.dx,
-      top: local.dy,
+      left: localOffset.dx,
+      top: localOffset.dy,
       child: GestureDetector(
-        onPanUpdate: (d) {
-          final deltaPage = Offset(d.delta.dx / scale, d.delta.dy / scale);
-          onUpdatePageOffset(overlay.pageOffset + deltaPage);
+        onPanStart: (details) {
+          _dragStartOffset = details.localPosition;
+          _initialPageOffset = widget.overlay.pageOffset;
         },
-        onLongPress: onDelete,
+        onPanUpdate: (details) {
+          // calculate movement delta
+          final delta = details.localPosition - _dragStartOffset;
+          // convert movement to PDF page coordinates
+          final newPageOffset = _initialPageOffset +
+              Offset(delta.dx / scale, delta.dy / scale);
+          widget.onUpdatePageOffset(newPageOffset);
+        },
+        onLongPress: () {
+          // optional delete confirmation
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Delete Text?'),
+              content: const Text('Do you want to remove this text overlay?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onDelete();
+                  },
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+        },
         child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: const BoxDecoration(color: Colors.transparent),
+          padding: const EdgeInsets.all(2),
+          color: Colors.transparent,
           child: Text(
-            overlay.text,
+            widget.overlay.text,
             style: TextStyle(
-              color: overlay.color,
-              fontSize: overlay.fontSize * scale,
+              color: widget.overlay.color,
+              fontSize: widget.overlay.fontSize * scale,
             ),
           ),
         ),
@@ -1161,41 +1179,8 @@ class _DraggableText extends StatelessWidget {
   }
 }
 
-class _DraggableImage extends StatelessWidget {
-  final _ImageOverlay overlay;
-  final Offset Function(int page, Offset pagePoint) pageToLocal;
-  final double Function(int page) effectiveScaleForPage;
-  final void Function(Offset newPageOffset) onUpdatePageOffset;
-  final VoidCallback onDelete;
-  const _DraggableImage({
-    required this.overlay,
-    required this.pageToLocal,
-    required this.effectiveScaleForPage,
-    required this.onUpdatePageOffset,
-    required this.onDelete,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final scale = effectiveScaleForPage(overlay.pageNumber);
-    final localTopLeft = pageToLocal(overlay.pageNumber, overlay.pageOffset);
-    final w = overlay.pageWidth * scale;
-    final h = overlay.pageHeight * scale;
-    return Positioned(
-      left: localTopLeft.dx,
-      top: localTopLeft.dy,
-      width: w,
-      height: h,
-      child: GestureDetector(
-        onPanUpdate: (d) {
-          final deltaPage = Offset(d.delta.dx / scale, d.delta.dy / scale);
-          onUpdatePageOffset(overlay.pageOffset + deltaPage);
-        },
-        onLongPress: onDelete,
-        child: Image.memory(overlay.bytes, width: w, height: h),
-      ),
-    );
-  }
-}
+
+
 class _HighlightWidget extends StatelessWidget {
   final _HighlightOverlay overlay;
   final Offset Function(int, Offset) pageToLocal;
@@ -1212,8 +1197,10 @@ class _HighlightWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = effectiveScaleForPage(overlay.pageNumber);
-    final topLeft = pageToLocal(overlay.pageNumber,
-        Offset(overlay.rect.left, overlay.rect.top));
+    final topLeft = pageToLocal(
+      overlay.pageNumber,
+      Offset(overlay.rect.left, overlay.rect.top),
+    );
     final w = overlay.rect.width * scale;
     final h = overlay.rect.height * scale;
 
@@ -1229,6 +1216,7 @@ class _HighlightWidget extends StatelessWidget {
     );
   }
 }
+
 class _DraggableResizableImage extends StatefulWidget {
   final _ImageOverlay overlay;
   final Offset Function(int, Offset) pageToLocal;
@@ -1244,25 +1232,27 @@ class _DraggableResizableImage extends StatefulWidget {
     required this.onUpdatePageOffset,
     required this.onUpdateSize,
     required this.onDelete,
-  });
+    Key? key,
+  }) : super(key: key);
 
   @override
-  State<_DraggableResizableImage> createState() => _DraggableResizableImageState();
+  State<_DraggableResizableImage> createState() =>
+      _DraggableResizableImageState();
 }
 
 class _DraggableResizableImageState extends State<_DraggableResizableImage> {
-  late double _currentScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentScale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
-  }
+  late double _initialPageWidth;
+  late double _initialPageHeight;
+  bool _isScaling = false;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
     final scale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
-    final topLeft = widget.pageToLocal(widget.overlay.pageNumber, widget.overlay.pageOffset);
+    final topLeft = widget.pageToLocal(
+      widget.overlay.pageNumber,
+      widget.overlay.pageOffset,
+    );
     final w = widget.overlay.pageWidth * scale;
     final h = widget.overlay.pageHeight * scale;
 
@@ -1272,20 +1262,44 @@ class _DraggableResizableImageState extends State<_DraggableResizableImage> {
       width: w,
       height: h,
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onLongPress: widget.onDelete,
+        onScaleStart: (details) {
+          // capture base sizes before pinch
+          _initialPageWidth = widget.overlay.pageWidth;
+          _initialPageHeight = widget.overlay.pageHeight;
+          _isScaling = details.pointerCount > 1;
+          _isDragging = details.pointerCount == 1;
+        },
         onScaleUpdate: (details) {
-          // ----- drag -----
-          if (details.pointerCount == 1) {
-            final delta = Offset(details.focalPointDelta.dx / scale,
-                details.focalPointDelta.dy / scale);
-            widget.onUpdatePageOffset(widget.overlay.pageOffset + delta);
-          }
-          // ----- pinch to resize -----
-          else if (details.pointerCount == 2) {
-            final newW = widget.overlay.pageWidth * details.scale;
-            final newH = widget.overlay.pageHeight * (newW / widget.overlay.pageWidth);
+          final pointerCount = details.pointerCount;
+          final currentScale = widget.effectiveScaleForPage(
+            widget.overlay.pageNumber,
+          );
+
+          if (pointerCount == 1) {
+            // dragging (single finger) — translate focalPointDelta into page delta
+            final deltaLocal = details.focalPointDelta;
+            final deltaPage = Offset(
+              deltaLocal.dx / currentScale,
+              deltaLocal.dy / currentScale,
+            );
+            widget.onUpdatePageOffset(widget.overlay.pageOffset + deltaPage);
+          } else if (pointerCount >= 2) {
+            // resizing (pinch) — compute from initial sizes (no compounding)
+            final newW = (_initialPageWidth * details.scale).clamp(
+              8.0,
+              10000.0,
+            );
+            // preserve aspect ratio:
+            final aspect = _initialPageHeight / _initialPageWidth;
+            final newH = newW * aspect;
             widget.onUpdateSize(newW, newH);
           }
+        },
+        onScaleEnd: (_) {
+          _isScaling = false;
+          _isDragging = false;
         },
         child: Image.memory(widget.overlay.bytes, fit: BoxFit.fill),
       ),
