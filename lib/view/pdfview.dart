@@ -254,6 +254,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   // Open edit sheet for existing text overlay
   Future<void> _openEditSheetForText(int index) async {
     final overlay = _texts[index];
+    // Make sure the text is visible above the bottom sheet
+    _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
     setState(() {
       _editingTextIndex = index;
       _selectedColor = overlay.color;
@@ -285,6 +287,21 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               initialBold: overlay.bold,
               initialItalic: overlay.italic,
               initialOpacity: overlay.opacity,
+              onLiveChange: (cfg) {
+                setState(() {
+                  _texts[index] = _texts[index].copyWith(
+                    color: (cfg['color'] as Color?) ?? _texts[index].color,
+                    backgroundColor:
+                        (cfg['bg'] as Color?) ?? _texts[index].backgroundColor,
+                    fontSize:
+                        (cfg['fontSize'] as double?) ?? _texts[index].fontSize,
+                    bold: (cfg['bold'] as bool?) ?? _texts[index].bold,
+                    italic: (cfg['italic'] as bool?) ?? _texts[index].italic,
+                    opacity:
+                        (cfg['opacity'] as double?) ?? _texts[index].opacity,
+                  );
+                });
+              },
             ),
           ),
         );
@@ -308,6 +325,18 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     setState(() {
       _editingTextIndex = null;
     });
+  }
+
+  void _ensureOverlayVisible(int page, Offset pagePoint) {
+    try {
+      final scale = _effectiveScaleForPage(page);
+      final top = _pageTopInScroll(page);
+      const desiredLocalY =
+          200.0; // keep near top, above the future bottom sheet
+      final targetScrollY = pagePoint.dy * scale + top - desiredLocalY;
+      final y = targetScrollY < 0 ? 0.0 : targetScrollY;
+      _controller.jumpTo(yOffset: y);
+    } catch (_) {}
   }
 
   // ---------------- signature pick ----------------
@@ -1034,6 +1063,7 @@ class PdfEditSheet extends StatefulWidget {
   final bool initialBold;
   final bool initialItalic;
   final double initialOpacity;
+  final void Function(Map<String, dynamic> cfg)? onLiveChange;
 
   const PdfEditSheet({
     super.key,
@@ -1043,6 +1073,7 @@ class PdfEditSheet extends StatefulWidget {
     required this.initialBold,
     required this.initialItalic,
     required this.initialOpacity,
+    this.onLiveChange,
   });
 
   @override
@@ -1180,7 +1211,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                               min: 8,
                               max: 48,
                               value: _fontSize,
-                              onChanged: (v) => setState(() => _fontSize = v),
+                              onChanged: (v) {
+                                setState(() => _fontSize = v);
+                                widget.onLiveChange?.call({
+                                  'action': 'text',
+                                  'color': _color,
+                                  'bg': _bg,
+                                  'fontSize': _fontSize,
+                                  'bold': _bold,
+                                  'italic': _italic,
+                                  'opacity': _opacity,
+                                });
+                              },
                             ),
                           ),
                           Text('${_fontSize.toInt()}pt'),
@@ -1195,8 +1237,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                               contentPadding: EdgeInsets.zero,
                               title: const Text('Bold'),
                               value: _bold,
-                              onChanged: (v) =>
-                                  setState(() => _bold = v ?? false),
+                              onChanged: (v) {
+                                setState(() => _bold = v ?? false);
+                                widget.onLiveChange?.call({
+                                  'action': 'text',
+                                  'color': _color,
+                                  'bg': _bg,
+                                  'fontSize': _fontSize,
+                                  'bold': _bold,
+                                  'italic': _italic,
+                                  'opacity': _opacity,
+                                });
+                              },
                             ),
                           ),
                           SizedBox(width: 30),
@@ -1206,8 +1258,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                               contentPadding: EdgeInsets.zero,
                               title: const Text('Italic'),
                               value: _italic,
-                              onChanged: (v) =>
-                                  setState(() => _italic = v ?? false),
+                              onChanged: (v) {
+                                setState(() => _italic = v ?? false);
+                                widget.onLiveChange?.call({
+                                  'action': 'text',
+                                  'color': _color,
+                                  'bg': _bg,
+                                  'fontSize': _fontSize,
+                                  'bold': _bold,
+                                  'italic': _italic,
+                                  'opacity': _opacity,
+                                });
+                              },
                             ),
                           ),
                         ],
@@ -1221,7 +1283,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                               min: 0.0,
                               max: 1.0,
                               value: _opacity,
-                              onChanged: (v) => setState(() => _opacity = v),
+                              onChanged: (v) {
+                                setState(() => _opacity = v);
+                                widget.onLiveChange?.call({
+                                  'action': 'text',
+                                  'color': _color,
+                                  'bg': _bg,
+                                  'fontSize': _fontSize,
+                                  'bold': _bold,
+                                  'italic': _italic,
+                                  'opacity': _opacity,
+                                });
+                              },
                             ),
                           ),
                           Text('${(_opacity * 100).toInt()}%'),
@@ -1264,7 +1337,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   }
 
   Widget _tinyDot(Color c) => GestureDetector(
-    onTap: () => setState(() => _color = c),
+    onTap: () {
+      setState(() => _color = c);
+      widget.onLiveChange?.call({
+        'action': 'text',
+        'color': _color,
+        'bg': _bg,
+        'fontSize': _fontSize,
+        'bold': _bold,
+        'italic': _italic,
+        'opacity': _opacity,
+      });
+    },
     child: CircleAvatar(
       backgroundColor: c,
       radius: 16,
@@ -1275,7 +1359,18 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   );
 
   Widget _tinyBg(Color c) => GestureDetector(
-    onTap: () => setState(() => _bg = c),
+    onTap: () {
+      setState(() => _bg = c);
+      widget.onLiveChange?.call({
+        'action': 'text',
+        'color': _color,
+        'bg': _bg,
+        'fontSize': _fontSize,
+        'bold': _bold,
+        'italic': _italic,
+        'opacity': _opacity,
+      });
+    },
     child: Container(
       width: 34,
       height: 34,
