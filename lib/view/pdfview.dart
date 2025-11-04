@@ -60,13 +60,22 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   double _selectedFontSize = 18;
   bool _selectedBold = false;
   bool _selectedItalic = false;
+  double _selectedOpacity = 1.0;
+
+  // track which text overlay is being edited (null = new text)
+  int? _editingTextIndex;
 
   @override
   void initState() {
     super.initState();
     RecentPDFStorage.addPDF(widget.path, widget.name);
+    // Listen to zoom and scroll changes to update overlay positions
     _controller.addListener(() {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          // Force rebuild to update overlay positions when zoom/scroll changes
+        });
+      }
     });
     _loadPageSizes();
   }
@@ -190,6 +199,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               initialFontSize: _selectedFontSize,
               initialBold: _selectedBold,
               initialItalic: _selectedItalic,
+              initialOpacity: _selectedOpacity,
             ),
           ),
         );
@@ -201,27 +211,23 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
+        _editingTextIndex = null;
       });
       return;
     }
 
     final action = result['action'] as String?;
     if (action == 'text') {
-      // store selected config and enable placement mode
+      // NEW WORKFLOW: Just enable text placement, user adds text first
       setState(() {
         _selectedTool = 'text';
-        _selectedColor = result['color'] as Color? ?? Colors.black;
-        _selectedBgColor = result['bg'] as Color? ?? Colors.transparent;
-        _selectedFontSize =
-            (result['fontSize'] as double?) ?? _selectedFontSize;
-        _selectedBold = (result['bold'] as bool?) ?? false;
-        _selectedItalic = (result['italic'] as bool?) ?? false;
         _awaitingTextPlacement = true;
+        _editingTextIndex = null; // new text
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Tap on PDF to add text (then drag to position). Save to embed.',
+            'Tap on PDF to add text',
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -240,8 +246,68 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
+        _editingTextIndex = null;
       });
     }
+  }
+
+  // Open edit sheet for existing text overlay
+  Future<void> _openEditSheetForText(int index) async {
+    final overlay = _texts[index];
+    setState(() {
+      _editingTextIndex = index;
+      _selectedColor = overlay.color;
+      _selectedBgColor = overlay.backgroundColor;
+      _selectedFontSize = overlay.fontSize;
+      _selectedBold = overlay.bold;
+      _selectedItalic = overlay.italic;
+      _selectedOpacity = overlay.opacity;
+    });
+
+    final result = await showModalBottomSheet<Map<String, dynamic>?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return FractionallySizedBox(
+          heightFactor: 0.55,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: PdfEditSheet(
+              initialColor: overlay.color,
+              initialBg: overlay.backgroundColor,
+              initialFontSize: overlay.fontSize,
+              initialBold: overlay.bold,
+              initialItalic: overlay.italic,
+              initialOpacity: overlay.opacity,
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result != null) {
+      // Update existing text overlay
+      setState(() {
+        _texts[index] = _texts[index].copyWith(
+          color: result['color'] as Color? ?? overlay.color,
+          backgroundColor: result['bg'] as Color? ?? overlay.backgroundColor,
+          fontSize: (result['fontSize'] as double?) ?? overlay.fontSize,
+          bold: (result['bold'] as bool?) ?? overlay.bold,
+          italic: (result['italic'] as bool?) ?? overlay.italic,
+          opacity: (result['opacity'] as double?) ?? overlay.opacity,
+        );
+      });
+    }
+
+    setState(() {
+      _editingTextIndex = null;
+    });
   }
 
   // ---------------- signature pick ----------------
@@ -493,34 +559,52 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   hintText: 'Type text',
                   hintStyle: Theme.of(context).textTheme.titleSmall,
                 ),
+                autofocus: true,
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _awaitingTextPlacement = false;
+                  _selectedTool = '';
+                });
+              },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
                 final text = tc.text.trim();
                 if (text.isEmpty) return;
+                Navigator.pop(ctx);
+
                 if (_pageSizes.isEmpty) {
                   await _loadPageSizes();
                 }
                 final hit = _localToPage(pos);
+
+                // Add text with default styling, then open edit sheet
+                final newIndex = _texts.length;
                 final overlay = _TextOverlay(
                   pageNumber: hit.page,
                   text: text,
-                  color: _selectedColor,
-                  fontSize: _selectedFontSize,
-                  backgroundColor: _selectedBgColor,
-                  bold: _selectedBold,
-                  italic: _selectedItalic,
+                  color: Colors.black,
+                  fontSize: 18,
+                  backgroundColor: Colors.transparent,
+                  bold: false,
+                  italic: false,
+                  opacity: 1.0,
                   pageOffset: hit.pagePoint,
                 );
-                setState(() => _texts.add(overlay));
-                Navigator.pop(ctx);
+                setState(() {
+                  _texts.add(overlay);
+                  _awaitingTextPlacement = false;
+                });
+
+                // Now open edit sheet to configure styling
+                await _openEditSheetForText(newIndex);
               },
               child: const Text('Add'),
             ),
@@ -630,7 +714,12 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           );
         }
         final brush = PdfSolidBrush(
-          PdfColor(t.color.red, t.color.green, t.color.blue),
+          PdfColor(
+            t.color.red,
+            t.color.green,
+            t.color.blue,
+            (255 * t.opacity).round(),
+          ),
         );
         page.graphics.drawString(
           t.text,
@@ -908,6 +997,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         effectiveScaleForPage: _effectiveScaleForPage,
                         onUpdatePageOffset: (o) => _updateTextPosition(i, o),
                         onDelete: () => _removeText(i),
+                        onTap: () => _openEditSheetForText(i),
                       ),
 
                     // ----- signature overlays (now resizable) -----
@@ -943,6 +1033,7 @@ class PdfEditSheet extends StatefulWidget {
   final double initialFontSize;
   final bool initialBold;
   final bool initialItalic;
+  final double initialOpacity;
 
   const PdfEditSheet({
     super.key,
@@ -951,6 +1042,7 @@ class PdfEditSheet extends StatefulWidget {
     required this.initialFontSize,
     required this.initialBold,
     required this.initialItalic,
+    required this.initialOpacity,
   });
 
   @override
@@ -965,6 +1057,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   double _fontSize = 18;
   bool _bold = false;
   bool _italic = false;
+  double _opacity = 1.0;
 
   @override
   void initState() {
@@ -975,6 +1068,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     _fontSize = widget.initialFontSize;
     _bold = widget.initialBold;
     _italic = widget.initialItalic;
+    _opacity = widget.initialOpacity;
   }
 
   @override
@@ -991,6 +1085,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
       'fontSize': _fontSize,
       'bold': _bold,
       'italic': _italic,
+      'opacity': _opacity,
     });
   }
 
@@ -1039,86 +1134,102 @@ class _PdfEditSheetState extends State<PdfEditSheet>
             controller: _tabController,
             children: [
               // Text options (colors, bg, font size)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Color'),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _tinyDot(Colors.black),
-                        _tinyDot(Colors.red),
-                        _tinyDot(Colors.blue),
-                        _tinyDot(Colors.green),
-                        _tinyDot(Colors.orange),
-                        _tinyDot(Colors.purple),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Background'),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _tinyBg(Colors.transparent),
-                        _tinyBg(Colors.yellow),
-                        _tinyBg(Colors.orange),
-                        _tinyBg(Colors.pink),
-                        _tinyBg(Colors.lightGreen),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Text('Size:'),
-                        Expanded(
-                          child: Slider(
-                            min: 8,
-                            max: 48,
-                            value: _fontSize,
-                            onChanged: (v) => setState(() => _fontSize = v),
+              SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Color'),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _tinyDot(Colors.black),
+                          _tinyDot(Colors.red),
+                          _tinyDot(Colors.blue),
+                          _tinyDot(Colors.green),
+                          _tinyDot(Colors.orange),
+                          _tinyDot(Colors.purple),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Background'),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _tinyBg(Colors.transparent),
+                          _tinyBg(Colors.yellow),
+                          _tinyBg(Colors.orange),
+                          _tinyBg(Colors.pink),
+                          _tinyBg(Colors.lightGreen),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('Size:'),
+                          Expanded(
+                            child: Slider(
+                              min: 8,
+                              max: 48,
+                              value: _fontSize,
+                              onChanged: (v) => setState(() => _fontSize = v),
+                            ),
                           ),
-                        ),
-                        Text('${_fontSize.toInt()}pt'),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CheckboxListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Bold'),
-                            value: _bold,
-                            onChanged: (v) =>
-                                setState(() => _bold = v ?? false),
+                          Text('${_fontSize.toInt()}pt'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Bold'),
+                              value: _bold,
+                              onChanged: (v) =>
+                                  setState(() => _bold = v ?? false),
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 30),
-                        Expanded(
-                          child: CheckboxListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Italic'),
-                            value: _italic,
-                            onChanged: (v) =>
-                                setState(() => _italic = v ?? false),
+                          SizedBox(width: 30),
+                          Expanded(
+                            child: CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Italic'),
+                              value: _italic,
+                              onChanged: (v) =>
+                                  setState(() => _italic = v ?? false),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('Opacity:'),
+                          Expanded(
+                            child: Slider(
+                              min: 0.0,
+                              max: 1.0,
+                              value: _opacity,
+                              onChanged: (v) => setState(() => _opacity = v),
+                            ),
+                          ),
+                          Text('${(_opacity * 100).toInt()}%'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
                 ),
               ),
 
@@ -1199,6 +1310,7 @@ class _TextOverlay {
   final Color backgroundColor;
   final bool bold;
   final bool italic;
+  final double opacity;
   final Offset pageOffset; // in PDF page points
   _TextOverlay({
     required this.pageNumber,
@@ -1208,6 +1320,7 @@ class _TextOverlay {
     required this.backgroundColor,
     required this.bold,
     required this.italic,
+    required this.opacity,
     required this.pageOffset,
   });
 
@@ -1218,6 +1331,7 @@ class _TextOverlay {
     Color? backgroundColor,
     bool? bold,
     bool? italic,
+    double? opacity,
   }) => _TextOverlay(
     pageNumber: pageNumber,
     text: text,
@@ -1226,6 +1340,7 @@ class _TextOverlay {
     backgroundColor: backgroundColor ?? this.backgroundColor,
     bold: bold ?? this.bold,
     italic: italic ?? this.italic,
+    opacity: opacity ?? this.opacity,
     pageOffset: pageOffset ?? this.pageOffset,
   );
 }
@@ -1264,6 +1379,7 @@ class _DraggableText extends StatefulWidget {
   final double Function(int page) effectiveScaleForPage;
   final ValueChanged<Offset> onUpdatePageOffset;
   final VoidCallback onDelete;
+  final VoidCallback onTap;
 
   const _DraggableText({
     required this.overlay,
@@ -1271,6 +1387,7 @@ class _DraggableText extends StatefulWidget {
     required this.effectiveScaleForPage,
     required this.onUpdatePageOffset,
     required this.onDelete,
+    required this.onTap,
     Key? key,
   }) : super(key: key);
 
@@ -1294,6 +1411,7 @@ class _DraggableTextState extends State<_DraggableText> {
       left: localOffset.dx,
       top: localOffset.dy,
       child: GestureDetector(
+        onTap: widget.onTap,
         onPanStart: (details) {
           _dragStartOffset = details.localPosition;
           _initialPageOffset = widget.overlay.pageOffset;
@@ -1329,20 +1447,23 @@ class _DraggableTextState extends State<_DraggableText> {
             ),
           );
         },
-        child: Container(
-          padding: const EdgeInsets.all(2),
-          color: widget.overlay.backgroundColor,
-          child: Text(
-            widget.overlay.text,
-            style: TextStyle(
-              color: widget.overlay.color,
-              fontSize: widget.overlay.fontSize * scale,
-              fontWeight: widget.overlay.bold
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-              fontStyle: widget.overlay.italic
-                  ? FontStyle.italic
-                  : FontStyle.normal,
+        child: Opacity(
+          opacity: widget.overlay.opacity,
+          child: Container(
+            padding: const EdgeInsets.all(2),
+            color: widget.overlay.backgroundColor,
+            child: Text(
+              widget.overlay.text,
+              style: TextStyle(
+                color: widget.overlay.color,
+                fontSize: widget.overlay.fontSize * scale,
+                fontWeight: widget.overlay.bold
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                fontStyle: widget.overlay.italic
+                    ? FontStyle.italic
+                    : FontStyle.normal,
+              ),
             ),
           ),
         ),
