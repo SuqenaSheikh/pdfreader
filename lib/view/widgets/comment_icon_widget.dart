@@ -6,7 +6,7 @@ class CommentIconWidget extends StatelessWidget {
   final Offset Function(int page, Offset pagePoint) pageToLocal;
   final double Function(int page) effectiveScaleForPage;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final Future<void> Function() onDelete;
 
   const CommentIconWidget({
     required this.overlay,
@@ -40,9 +40,9 @@ class CommentIconWidget extends StatelessWidget {
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(context);
-                    onDelete();
+                    await onDelete();
                   },
                   child: const Text('Delete'),
                 ),

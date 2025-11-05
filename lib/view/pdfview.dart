@@ -16,6 +16,7 @@ import '../contents/model/pdf_models.dart';
 import 'widgets/pdf_edit_sheet.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
+import '../contents/services/comment_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -85,6 +86,23 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       }
     });
     _loadPageSizes();
+    _loadComments();
+  }
+
+  // Load comments from storage
+  Future<void> _loadComments() async {
+    final comments = await CommentStorage.loadComments(widget.path);
+    if (mounted) {
+      setState(() {
+        _comments.clear();
+        _comments.addAll(comments);
+      });
+    }
+  }
+
+  // Save comments to storage
+  Future<void> _saveComments() async {
+    await CommentStorage.saveComments(widget.path, _comments);
   }
 
   Future<void> _loadPageSizes() async {
@@ -667,14 +685,18 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     setState(() => _highlights.removeAt(index));
   }
 
-  void _removeComment(int index) {
+  Future<void> _removeComment(int index) async {
     setState(() => _comments.removeAt(index));
+    // Save comments after removing
+    await _saveComments();
   }
 
-  void _updateComment(int index, String newComment) {
+  Future<void> _updateComment(int index, String newComment) async {
     setState(() {
       _comments[index] = _comments[index].copyWith(comment: newComment);
     });
+    // Save comments after updating
+    await _saveComments();
   }
 
   // Show dialog to add a new comment
@@ -735,6 +757,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   _awaitingCommentPlacement = false;
                   _selectedTool = '';
                 });
+                // Save comments after adding
+                await _saveComments();
               },
               child: const Text('Add'),
             ),
@@ -759,96 +783,103 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return FractionallySizedBox(
-          heightFactor: 0.4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+        final keyboardHeight = MediaQuery.of(ctx).viewInsets.bottom;
+        return GestureDetector(
+          onTap: ()=>FocusScope.of(context).unfocus(),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: keyboardHeight),
+            child: FractionallySizedBox(
+              heightFactor: keyboardHeight > 0 ? 0.7 : 0.4,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
                   ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                      const Spacer(),
-                      Text(
-                        'Comment',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: const Icon(Icons.close),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Comment',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () async {
+                              final newComment = tc.text.trim();
+                              if (newComment.isEmpty) {
+                                // Delete comment if empty
+                                Navigator.pop(ctx);
+                                await _removeComment(index);
+                              } else {
+                                // Update comment
+                                Navigator.pop(ctx);
+                                await _updateComment(index, newComment);
+                              }
+                            },
+                            icon: const Icon(Icons.check),
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () {
-                          final newComment = tc.text.trim();
-                          if (newComment.isEmpty) {
-                            // Delete comment if empty
-                            Navigator.pop(ctx);
-                            _removeComment(index);
-                          } else {
-                            // Update comment
-                            Navigator.pop(ctx);
-                            _updateComment(index, newComment);
-                          }
+                    ),
+                    const Divider(),
+                    // Comment text field
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: tc,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your comment...',
+                            hintStyle: Theme.of(context).textTheme.bodyMedium,
+                            border: InputBorder.none,
+                          ),
+                          autofocus: true,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                        ),
+                      ),
+                    ),
+                    // Delete button
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _removeComment(index);
                         },
-                        icon: const Icon(Icons.check),
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text(
+                          'Delete Comment',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Comment text field
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: tc,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                      decoration: InputDecoration(
-                        hintText: 'Enter your comment...',
-                        hintStyle: Theme.of(context).textTheme.bodyMedium,
-                        border: InputBorder.none,
-                      ),
-                      autofocus: true,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
                     ),
-                  ),
+                  ],
                 ),
-                // Delete button
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _removeComment(index);
-                    },
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    label: const Text(
-                      'Delete Comment',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -1029,12 +1060,15 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       final outFile = File('${targetDir.path}/$outName');
       await outFile.writeAsBytes(newBytes);
 
-      // Clear overlays (flattened now)
+      // Clear overlays (flattened now) - but keep comments
       setState(() {
         _highlights.clear();
         _texts.clear();
         _images.clear();
       });
+
+      // Update comments path mapping to new saved file
+      await CommentStorage.updateCommentsPath(widget.path, outFile.path);
 
       // Notify and reload viewer
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1227,7 +1261,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         pageToLocal: _pageToLocal,
                         effectiveScaleForPage: _effectiveScaleForPage,
                         onTap: () => _showCommentSheet(i),
-                        onDelete: () => _removeComment(i),
+                        onDelete: () async => await _removeComment(i),
                       ),
                   ],
                 ),
