@@ -9,7 +9,7 @@ class PdfEditSheet extends StatefulWidget {
   final double initialOpacity;
   final void Function(Map<String, dynamic> cfg)? onLiveChange;
 
-  const PdfEditSheet({
+   PdfEditSheet({
     super.key,
     required this.initialColor,
     required this.initialBg,

@@ -23,8 +23,9 @@ import 'package:permission_handler/permission_handler.dart';
 class PDFViewerScreen extends StatefulWidget {
   final String path;
   final String name;
+  final bool isedit;
 
-  const PDFViewerScreen({super.key, required this.path, required this.name});
+  const PDFViewerScreen({super.key, required this.path, required this.name, required this.isedit});
 
   @override
   State<PDFViewerScreen> createState() => _PDFViewerScreenState();
@@ -56,12 +57,9 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // page metrics
   final List<Size> _pageSizes = [];
-  final double _pageSpacing = 8.0; // keep in sync with SfPdfViewer.pageSpacing
-  // removed unused pagesReady flag
+  final double _pageSpacing = 8.0;
 
-  // temporary mode flag: after closing sheet for text, we enable placement until the user adds a text overlay
   bool _awaitingTextPlacement = false;
-  // temporary mode flag: after closing sheet for comment, we enable placement until the user adds a comment
   bool _awaitingCommentPlacement = false;
 
   // selected text config from bottom sheet
@@ -71,8 +69,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   double _selectedOpacity = 1.0;
 
   // track which text overlay is being edited (null = new text)
-  // editing index no longer tracked
-
   @override
   void initState() {
     super.initState();
@@ -81,7 +77,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     _controller.addListener(() {
       if (mounted) {
         setState(() {
-          // Force rebuild to update overlay positions when zoom/scroll changes
         });
       }
     });
@@ -1086,7 +1081,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) =>
-                PDFViewerScreen(path: outFile.path, name: widget.name),
+                PDFViewerScreen(path: outFile.path, name: widget.name,isedit: true),
           ),
         );
       }
@@ -1142,15 +1137,17 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                       ),
                       const SizedBox(width: 12),
                       // open the edit sheet
+                      widget.isedit?
                       GestureDetector(
                         onTap: _openEditSheet,
                         child: SvgPicture.asset(Assets.fileEdit),
-                      ),
+                      ):SizedBox(width: 0,),
                       const SizedBox(width: 6),
+                      widget.isedit?
                       IconButton(
                         onPressed: _savePdfWithChanges,
                         icon: const Icon(Icons.save),
-                      ),
+                      ):SizedBox(width: 0,),
                     ],
                   ),
                 ],
