@@ -37,7 +37,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _color = widget.initialColor;
     _bg = widget.initialBg;
     _fontSize = widget.initialFontSize;
@@ -68,6 +68,10 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     Navigator.of(context).pop({'action': 'signature'});
   }
 
+  void _doneAsComment() {
+    Navigator.of(context).pop({'action': 'comment'});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -87,8 +91,11 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                   // confirm based on active tab
                   if (_tabController.index == 0) {
                     _doneAsText();
-                  } else {
+                  } else if (_tabController.index == 1) {
                     _doneAsSignature();
+                  } else {
+                    // Comments tab
+                    Navigator.of(context).pop({'action': 'comment'});
                   }
                 },
                 icon: const Icon(Icons.check),
@@ -102,6 +109,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
           tabs: const [
             Tab(text: 'Text'),
             Tab(text: 'Signature'),
+            Tab(text: 'Comment'),
           ],
         ),
 
@@ -269,6 +277,40 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         'Sign on white blank paper. After uploading you can drag signature on the PDF and Save.',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+
+              // Comment tab: instructions for adding comments
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    const Spacer(),
+                    Icon(
+                      Icons.comment,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Add Hidden Comments',
+                      style: Theme.of(context).textTheme.titleLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      textAlign: TextAlign.center,
+                      'Tap on the PDF to add a comment. A comment icon will appear. Tap the icon to view or edit your comment.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _doneAsComment,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Ready to Add Comment'),
                     ),
                     const Spacer(),
                   ],

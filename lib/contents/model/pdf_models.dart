@@ -83,3 +83,26 @@ class ImageOverlay {
     pageHeight: pageHeight ?? this.pageHeight,
   );
 }
+class CommentOverlay {
+  final int pageNumber;
+  final Offset pageOffset;
+  final String comment;
+
+  CommentOverlay({
+    required this.pageNumber,
+    required this.pageOffset,
+    required this.comment,
+  });
+
+  CommentOverlay copyWith({
+    int? pageNumber,
+    Offset? pageOffset,
+    String? comment,
+  }) {
+    return CommentOverlay(
+      pageNumber: pageNumber ?? this.pageNumber,
+      pageOffset: pageOffset ?? this.pageOffset,
+      comment: comment ?? this.comment,
+    );
+  }
+}

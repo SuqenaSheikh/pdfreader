@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pdfread/view/widgets/draggable_image.dart';
 import 'package:pdfread/view/widgets/draggable_text.dart';
 import 'package:pdfread/view/widgets/heighlight_widget.dart';
+import 'package:pdfread/view/widgets/comment_icon_widget.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
@@ -18,7 +19,6 @@ import '../contents/services/recent_pdf_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
-// ---------------- main screen ----------------
 class PDFViewerScreen extends StatefulWidget {
   final String path;
   final String name;
@@ -34,11 +34,12 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final TextEditingController _searchController = TextEditingController();
   final GlobalKey _viewerKey = GlobalKey();
   final ImagePicker _imagePicker = ImagePicker();
+  final List<CommentOverlay> _comments = [];
 
   // UI stat
   bool _showSearchBar = false;
   String _selectedTool =
-      ''; // '', 'text', 'signature'  (highlight left to selection menu)
+      ''; // '', 'text', 'signature', 'comment'  (highlight left to selection menu)
   Color _selectedColor = Colors.black;
   Color _selectedBgColor = Colors.transparent;
   // removed unused _opacity field
@@ -59,6 +60,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // temporary mode flag: after closing sheet for text, we enable placement until the user adds a text overlay
   bool _awaitingTextPlacement = false;
+  // temporary mode flag: after closing sheet for comment, we enable placement until the user adds a comment
+  bool _awaitingCommentPlacement = false;
 
   // selected text config from bottom sheet
   double _selectedFontSize = 18;
@@ -216,6 +219,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
+        _awaitingCommentPlacement = false;
       });
       return;
     }
@@ -237,6 +241,22 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           ),
         ),
       );
+    } else if (action == 'comment') {
+      // Enable comment placement mode
+      setState(() {
+        _selectedTool = 'comment';
+        _awaitingCommentPlacement = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tap on PDF to add a comment',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+          ),
+        ),
+      );
     } else if (action == 'signature') {
       // immediately open image picker (sheet asked to upload signature)
       setState(() {
@@ -249,6 +269,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
+        _awaitingCommentPlacement = false;
       });
     }
   }
@@ -431,39 +452,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     }
   }
 
-  // Future<Uint8List?> _removeWhiteBackground(
-  //     Uint8List inputBytes, {
-  //       int threshold = 200,
-  //       int tolerance = 55,
-  //     }) async {
-  //   try {
-  //     final ui.Codec codec = await ui.instantiateImageCodec(inputBytes);
-  //     final ui.FrameInfo fi = await codec.getNextFrame();
-  //     final ui.Image img = fi.image;
-  //     final ByteData? bd = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-  //     if (bd == null) return inputBytes;
-  //
-  //     final Uint8List pixels = bd.buffer.asUint8List();
-  //     for (int i = 0; i < pixels.length; i += 4) {
-  //       final r = pixels[i];
-  //       final g = pixels[i + 1];
-  //       final b = pixels[i + 2];
-  //
-  //       if (r >= threshold && g >= threshold && b >= threshold &&
-  //           (r - threshold).abs() <= tolerance &&
-  //           (g - threshold).abs() <= tolerance &&
-  //           (b - threshold).abs() <= tolerance) {
-  //         pixels[i + 3] = 0; // transparent
-  //       }
-  //     }
-  //
-  //     final ui.Image out = await _imageFromPixels(pixels, img.width, img.height);
-  //     final ByteData? png = await out.toByteData(format: ui.ImageByteFormat.png);
-  //     return png?.buffer.asUint8List();
-  //   } catch (_) {
-  //     return inputBytes;
-  //   }
-  // }
   Future<ui.Image> _imageFromPixels(
     Uint8List rgbaPixels,
     int width,
@@ -557,6 +545,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _awaitingTextPlacement = false;
         // keep _selectedTool == 'text' so draggable UI remains active; user must press Save to flatten
+      });
+    } else if (_selectedTool == 'comment' && _awaitingCommentPlacement) {
+      _showAddCommentDialog(localPos);
+      // after adding one comment, keep placement off so user can choose again via bottom sheet
+      setState(() {
+        _awaitingCommentPlacement = false;
+        _selectedTool = '';
       });
     }
   }
@@ -670,6 +665,195 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   void _removeHighlight(int index) {
     setState(() => _highlights.removeAt(index));
+  }
+
+  void _removeComment(int index) {
+    setState(() => _comments.removeAt(index));
+  }
+
+  void _updateComment(int index, String newComment) {
+    setState(() {
+      _comments[index] = _comments[index].copyWith(comment: newComment);
+    });
+  }
+
+  // Show dialog to add a new comment
+  Future<void> _showAddCommentDialog(Offset pos) async {
+    final TextEditingController tc = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Add Comment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: tc,
+                style: Theme.of(context).textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: 'Enter your comment...',
+                  hintStyle: Theme.of(context).textTheme.bodyMedium,
+                ),
+                autofocus: true,
+                maxLines: 4,
+                minLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _awaitingCommentPlacement = false;
+                  _selectedTool = '';
+                });
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final comment = tc.text.trim();
+                if (comment.isEmpty) return;
+                Navigator.pop(ctx);
+
+                if (_pageSizes.isEmpty) {
+                  await _loadPageSizes();
+                }
+                final hit = _localToPage(pos);
+
+                // Add comment overlay
+                final overlay = CommentOverlay(
+                  pageNumber: hit.page,
+                  pageOffset: hit.pagePoint,
+                  comment: comment,
+                );
+                setState(() {
+                  _comments.add(overlay);
+                  _awaitingCommentPlacement = false;
+                  _selectedTool = '';
+                });
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Show bottom sheet to view/edit comment
+  Future<void> _showCommentSheet(int index) async {
+    final overlay = _comments[index];
+    // Make sure the comment is visible above the bottom sheet
+    _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
+
+    final TextEditingController tc = TextEditingController(
+      text: overlay.comment,
+    );
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return FractionallySizedBox(
+          heightFactor: 0.4,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Comment',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () {
+                          final newComment = tc.text.trim();
+                          if (newComment.isEmpty) {
+                            // Delete comment if empty
+                            Navigator.pop(ctx);
+                            _removeComment(index);
+                          } else {
+                            // Update comment
+                            Navigator.pop(ctx);
+                            _updateComment(index, newComment);
+                          }
+                        },
+                        icon: const Icon(Icons.check),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Comment text field
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: tc,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your comment...',
+                        hintStyle: Theme.of(context).textTheme.bodyMedium,
+                        border: InputBorder.none,
+                      ),
+                      autofocus: true,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                    ),
+                  ),
+                ),
+                // Delete button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _removeComment(index);
+                    },
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    label: const Text(
+                      'Delete Comment',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // ---------------- Save to PDF (unchanged) ----------------
@@ -894,7 +1078,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top bar
+            // AppBar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
@@ -981,7 +1165,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 padding: const EdgeInsets.only(top: 8, left: 7, right: 7),
                 child: Stack(
                   children: [
-                    // ----- PDF viewer -----
                     Positioned.fill(
                       child: Container(
                         key: _viewerKey,
@@ -1035,6 +1218,16 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         onUpdatePageOffset: (o) => _updateImagePosition(i, o),
                         onUpdateSize: (w, h) => _updateImageSize(i, w, h),
                         onDelete: () => _removeImage(i),
+                      ),
+
+                    // ----- comment icon overlays -----
+                    for (int i = 0; i < _comments.length; i++)
+                      CommentIconWidget(
+                        overlay: _comments[i],
+                        pageToLocal: _pageToLocal,
+                        effectiveScaleForPage: _effectiveScaleForPage,
+                        onTap: () => _showCommentSheet(i),
+                        onDelete: () => _removeComment(i),
                       ),
                   ],
                 ),
