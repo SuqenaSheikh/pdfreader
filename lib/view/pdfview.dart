@@ -785,7 +785,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       builder: (ctx) {
         final keyboardHeight = MediaQuery.of(ctx).viewInsets.bottom;
         return GestureDetector(
-          onTap: ()=>FocusScope.of(context).unfocus(),
+          onTap: () => FocusScope.of(context).unfocus(),
           child: Padding(
             padding: EdgeInsets.only(bottom: keyboardHeight),
             child: FractionallySizedBox(
