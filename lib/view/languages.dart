@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:pdfread/view/widgets/bottom_navigation_bar.dart';
 
 import '../contents/services/app_start_service.dart';
 import '../controller/local_controller.dart';
@@ -122,7 +123,7 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                             final isFirstTime = await AppStartService.isFirstLaunch();
                             if (isFirstTime) {
                               await AppStartService.setLaunched();
-                              Get.off(()=>HomeScreen());
+                              Get.off(()=>BottomBar());
                             } else {
                               Get.back(); // if from settings
                             }

@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 16),
+            SizedBox(height: size.height * 0.05),
 
             ///Appbar
             Padding(

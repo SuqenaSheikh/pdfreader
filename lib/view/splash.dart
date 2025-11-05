@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:pdfread/view/homeview.dart';
+import 'package:pdfread/view/widgets/bottom_navigation_bar.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/app_start_service.dart';
 import 'home.dart';
@@ -45,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (isFirstTime) {
           Get.offAll(()=>SelectLanguageScreen());
         } else {
-          Get.offAll(()=>HomeScreen());
+          Get.offAll(()=>BottomBar());
         }
       }
     });

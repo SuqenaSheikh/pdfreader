@@ -5,9 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdfread/view/widgets/draggable_image.dart';
+import 'package:pdfread/view/widgets/draggable_text.dart';
+import 'package:pdfread/view/widgets/heighlight_widget.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
+import '../contents/model/pdf_models.dart';
+import 'widgets/pdf_edit_sheet.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
 import 'package:http/http.dart' as http;
@@ -36,22 +41,21 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       ''; // '', 'text', 'signature'  (highlight left to selection menu)
   Color _selectedColor = Colors.black;
   Color _selectedBgColor = Colors.transparent;
-  double _opacity = 0.5;
+  // removed unused _opacity field
 
   // selection storage (unchanged)
-  Rect? _lastSelectionGlobalRect;
-  String? _lastSelectedText;
+  // removed unused selection cache
   int? _lastSelectedPageNumber;
 
   // overlays (kept as you had them)
-  final List<_HighlightOverlay> _highlights = [];
-  final List<_TextOverlay> _texts = [];
-  final List<_ImageOverlay> _images = [];
+  final List<HighlightOverlay> _highlights = [];
+  final List<TextOverlay> _texts = [];
+  final List<ImageOverlay> _images = [];
 
   // page metrics
   final List<Size> _pageSizes = [];
   final double _pageSpacing = 8.0; // keep in sync with SfPdfViewer.pageSpacing
-  bool _pagesReady = false;
+  // removed unused pagesReady flag
 
   // temporary mode flag: after closing sheet for text, we enable placement until the user adds a text overlay
   bool _awaitingTextPlacement = false;
@@ -63,7 +67,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   double _selectedOpacity = 1.0;
 
   // track which text overlay is being edited (null = new text)
-  int? _editingTextIndex;
+  // editing index no longer tracked
 
   @override
   void initState() {
@@ -91,14 +95,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _pageSizes.add(Size(s.width, s.height));
       }
       doc.dispose();
-      setState(() {
-        _pagesReady = true;
-      });
-    } catch (_) {
-      setState(() {
-        _pagesReady = false;
-      });
-    }
+    } catch (_) {}
   }
 
   double _effectiveScaleForPage(int pageNumber) {
@@ -182,6 +179,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
       builder: (ctx) {
         return FractionallySizedBox(
           heightFactor: 0.55,
@@ -191,6 +189,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
             child: PdfEditSheet(
               // initial values passed for convenience
@@ -211,7 +216,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
-        _editingTextIndex = null;
       });
       return;
     }
@@ -222,7 +226,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = 'text';
         _awaitingTextPlacement = true;
-        _editingTextIndex = null; // new text
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -246,7 +249,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       setState(() {
         _selectedTool = '';
         _awaitingTextPlacement = false;
-        _editingTextIndex = null;
       });
     }
   }
@@ -257,7 +259,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     // Make sure the text is visible above the bottom sheet
     _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
     setState(() {
-      _editingTextIndex = index;
       _selectedColor = overlay.color;
       _selectedBgColor = overlay.backgroundColor;
       _selectedFontSize = overlay.fontSize;
@@ -270,6 +271,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
       builder: (ctx) {
         return FractionallySizedBox(
           heightFactor: 0.55,
@@ -279,6 +281,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
             child: PdfEditSheet(
               initialColor: overlay.color,
@@ -322,9 +331,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       });
     }
 
-    setState(() {
-      _editingTextIndex = null;
-    });
+    setState(() {});
   }
 
   void _ensureOverlayVisible(int page, Offset pagePoint) {
@@ -504,7 +511,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final targetW = pageW * 0.4;
     final targetH = targetW * (imgH / imgW);
 
-    final overlay = _ImageOverlay(
+    final overlay = ImageOverlay(
       bytes: cleaned,
       pageNumber: hit.page,
       pageOffset: Offset(
@@ -528,26 +535,16 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // ---------------- text selection (highlight via selection menu kept) ----------------
   void _onTextSelectionChanged(PdfTextSelectionChangedDetails details) {
+    // Keep selection menu behavior; no-op here
     if (details.selectedText == null || details.selectedText!.trim().isEmpty) {
-      _lastSelectedText = null;
-      _lastSelectionGlobalRect = null;
       _lastSelectedPageNumber = null;
       return;
     }
-    _lastSelectedText = details.selectedText;
-    _lastSelectionGlobalRect = details.globalSelectedRegion;
     _lastSelectedPageNumber ??= 1;
-    // NOTE: we intentionally do NOT auto-apply highlight here — keep selection menu behavior.
   }
 
   // ---------------- convert global rect to viewer local ----------------
-  Future<Rect?> _globalRectToLocal(Rect globalRect) async {
-    final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return null;
-    final topLeftLocal = box.globalToLocal(globalRect.topLeft);
-    final bottomRightLocal = box.globalToLocal(globalRect.bottomRight);
-    return Rect.fromPoints(topLeftLocal, bottomRightLocal);
-  }
+  // removed unused _globalRectToLocal
 
   // ---------------- place text on tap ----------------
   void _onViewerTap(TapUpDetails details) {
@@ -616,7 +613,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
                 // Add text with default styling, then open edit sheet
                 final newIndex = _texts.length;
-                final overlay = _TextOverlay(
+                final overlay = TextOverlay(
                   pageNumber: hit.page,
                   text: text,
                   color: Colors.black,
@@ -1011,7 +1008,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
                     // ----- highlights (now in PDF points) -----
                     for (int i = 0; i < _highlights.length; i++)
-                      _HighlightWidget(
+                      HighlightWidget(
                         overlay: _highlights[i],
                         pageToLocal: _pageToLocal,
                         effectiveScaleForPage: _effectiveScaleForPage,
@@ -1020,7 +1017,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
                     // ----- text overlays -----
                     for (int i = 0; i < _texts.length; i++)
-                      _DraggableText(
+                      DraggableText(
                         overlay: _texts[i],
                         pageToLocal: _pageToLocal,
                         effectiveScaleForPage: _effectiveScaleForPage,
@@ -1031,7 +1028,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
                     // ----- signature overlays (now resizable) -----
                     for (int i = 0; i < _images.length; i++)
-                      _DraggableResizableImage(
+                      DraggableResizableImage(
                         overlay: _images[i],
                         pageToLocal: _pageToLocal,
                         effectiveScaleForPage: _effectiveScaleForPage,
@@ -1048,646 +1045,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
             const SizedBox(height: 6),
           ],
         ),
-      ),
-    );
-  }
-
-  // (keep your other helper widgets & classes below unchanged)
-}
-
-// ---------------- Edit bottom sheet widget ----------------
-class PdfEditSheet extends StatefulWidget {
-  final Color initialColor;
-  final Color initialBg;
-  final double initialFontSize;
-  final bool initialBold;
-  final bool initialItalic;
-  final double initialOpacity;
-  final void Function(Map<String, dynamic> cfg)? onLiveChange;
-
-  const PdfEditSheet({
-    super.key,
-    required this.initialColor,
-    required this.initialBg,
-    required this.initialFontSize,
-    required this.initialBold,
-    required this.initialItalic,
-    required this.initialOpacity,
-    this.onLiveChange,
-  });
-
-  @override
-  State<PdfEditSheet> createState() => _PdfEditSheetState();
-}
-
-class _PdfEditSheetState extends State<PdfEditSheet>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  Color _color = Colors.black;
-  Color _bg = Colors.transparent;
-  double _fontSize = 18;
-  bool _bold = false;
-  bool _italic = false;
-  double _opacity = 1.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _color = widget.initialColor;
-    _bg = widget.initialBg;
-    _fontSize = widget.initialFontSize;
-    _bold = widget.initialBold;
-    _italic = widget.initialItalic;
-    _opacity = widget.initialOpacity;
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  void _doneAsText() {
-    Navigator.of(context).pop({
-      'action': 'text',
-      'color': _color,
-      'bg': _bg,
-      'fontSize': _fontSize,
-      'bold': _bold,
-      'italic': _italic,
-      'opacity': _opacity,
-    });
-  }
-
-  void _doneAsSignature() {
-    Navigator.of(context).pop({'action': 'signature'});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // header with close/check
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () {
-                  // confirm based on active tab
-                  if (_tabController.index == 0)
-                    _doneAsText();
-                  else
-                    _doneAsSignature();
-                },
-                icon: const Icon(Icons.check),
-              ),
-            ],
-          ),
-        ),
-
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Text'),
-            Tab(text: 'Signature'),
-          ],
-        ),
-
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Text options (colors, bg, font size)
-              SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('Color'),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _tinyDot(Colors.black),
-                          _tinyDot(Colors.red),
-                          _tinyDot(Colors.blue),
-                          _tinyDot(Colors.green),
-                          _tinyDot(Colors.orange),
-                          _tinyDot(Colors.purple),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('Background'),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _tinyBg(Colors.transparent),
-                          _tinyBg(Colors.yellow),
-                          _tinyBg(Colors.orange),
-                          _tinyBg(Colors.pink),
-                          _tinyBg(Colors.lightGreen),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Text('Size:'),
-                          Expanded(
-                            child: Slider(
-                              min: 8,
-                              max: 48,
-                              value: _fontSize,
-                              onChanged: (v) {
-                                setState(() => _fontSize = v);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
-                            ),
-                          ),
-                          Text('${_fontSize.toInt()}pt'),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Bold'),
-                              value: _bold,
-                              onChanged: (v) {
-                                setState(() => _bold = v ?? false);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
-                            ),
-                          ),
-                          SizedBox(width: 30),
-                          Expanded(
-                            child: CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Italic'),
-                              value: _italic,
-                              onChanged: (v) {
-                                setState(() => _italic = v ?? false);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Text('Opacity:'),
-                          Expanded(
-                            child: Slider(
-                              min: 0.0,
-                              max: 1.0,
-                              value: _opacity,
-                              onChanged: (v) {
-                                setState(() => _opacity = v);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
-                            ),
-                          ),
-                          Text('${(_opacity * 100).toInt()}%'),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Signature tab: only upload button (sheet will return 'signature' on Done)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: _doneAsSignature,
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Upload Signature'),
-                    ),
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Text(
-                        textAlign: TextAlign.center,
-                        'Sign on white blank paper. After uploading you can drag signature on the PDF and Save.',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _tinyDot(Color c) => GestureDetector(
-    onTap: () {
-      setState(() => _color = c);
-      widget.onLiveChange?.call({
-        'action': 'text',
-        'color': _color,
-        'bg': _bg,
-        'fontSize': _fontSize,
-        'bold': _bold,
-        'italic': _italic,
-        'opacity': _opacity,
-      });
-    },
-    child: CircleAvatar(
-      backgroundColor: c,
-      radius: 16,
-      child: _color == c
-          ? const Icon(Icons.check, color: Colors.white, size: 16)
-          : null,
-    ),
-  );
-
-  Widget _tinyBg(Color c) => GestureDetector(
-    onTap: () {
-      setState(() => _bg = c);
-      widget.onLiveChange?.call({
-        'action': 'text',
-        'color': _color,
-        'bg': _bg,
-        'fontSize': _fontSize,
-        'bold': _bold,
-        'italic': _italic,
-        'opacity': _opacity,
-      });
-    },
-    child: Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: c,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: _bg == c ? const Icon(Icons.check, size: 16) : null,
-    ),
-  );
-}
-
-// ---------------- overlay data types & draggable widgets (kept) ----------------
-class _HighlightOverlay {
-  final int pageNumber;
-  final Rect rect;
-  final Color color;
-
-  _HighlightOverlay({
-    required this.pageNumber,
-    required this.rect,
-    required this.color,
-  });
-}
-
-class _TextOverlay {
-  final int pageNumber;
-  final String text;
-  final Color color;
-  final double fontSize;
-  final Color backgroundColor;
-  final bool bold;
-  final bool italic;
-  final double opacity;
-  final Offset pageOffset; // in PDF page points
-  _TextOverlay({
-    required this.pageNumber,
-    required this.text,
-    required this.color,
-    required this.fontSize,
-    required this.backgroundColor,
-    required this.bold,
-    required this.italic,
-    required this.opacity,
-    required this.pageOffset,
-  });
-
-  _TextOverlay copyWith({
-    Offset? pageOffset,
-    double? fontSize,
-    Color? color,
-    Color? backgroundColor,
-    bool? bold,
-    bool? italic,
-    double? opacity,
-  }) => _TextOverlay(
-    pageNumber: pageNumber,
-    text: text,
-    color: color ?? this.color,
-    fontSize: fontSize ?? this.fontSize,
-    backgroundColor: backgroundColor ?? this.backgroundColor,
-    bold: bold ?? this.bold,
-    italic: italic ?? this.italic,
-    opacity: opacity ?? this.opacity,
-    pageOffset: pageOffset ?? this.pageOffset,
-  );
-}
-
-class _ImageOverlay {
-  final Uint8List bytes;
-  final int pageNumber;
-  final Offset pageOffset; // top‑left in PDF points
-  double pageWidth; // mutable
-  double pageHeight; // mutable
-
-  _ImageOverlay({
-    required this.bytes,
-    required this.pageNumber,
-    required this.pageOffset,
-    required this.pageWidth,
-    required this.pageHeight,
-  });
-
-  _ImageOverlay copyWith({
-    Offset? pageOffset,
-    double? pageWidth,
-    double? pageHeight,
-  }) => _ImageOverlay(
-    bytes: bytes,
-    pageNumber: pageNumber,
-    pageOffset: pageOffset ?? this.pageOffset,
-    pageWidth: pageWidth ?? this.pageWidth,
-    pageHeight: pageHeight ?? this.pageHeight,
-  );
-}
-
-class _DraggableText extends StatefulWidget {
-  final _TextOverlay overlay;
-  final Offset Function(int page, Offset pagePoint) pageToLocal;
-  final double Function(int page) effectiveScaleForPage;
-  final ValueChanged<Offset> onUpdatePageOffset;
-  final VoidCallback onDelete;
-  final VoidCallback onTap;
-
-  const _DraggableText({
-    required this.overlay,
-    required this.pageToLocal,
-    required this.effectiveScaleForPage,
-    required this.onUpdatePageOffset,
-    required this.onDelete,
-    required this.onTap,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  State<_DraggableText> createState() => _DraggableTextState();
-}
-
-class _DraggableTextState extends State<_DraggableText> {
-  Offset _dragStartOffset = Offset.zero;
-  Offset _initialPageOffset = Offset.zero;
-
-  @override
-  Widget build(BuildContext context) {
-    final localOffset = widget.pageToLocal(
-      widget.overlay.pageNumber,
-      widget.overlay.pageOffset,
-    );
-    final scale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
-
-    return Positioned(
-      left: localOffset.dx,
-      top: localOffset.dy,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onPanStart: (details) {
-          _dragStartOffset = details.localPosition;
-          _initialPageOffset = widget.overlay.pageOffset;
-        },
-        onPanUpdate: (details) {
-          // calculate movement delta
-          final delta = details.localPosition - _dragStartOffset;
-          // convert movement to PDF page coordinates
-          final newPageOffset =
-              _initialPageOffset + Offset(delta.dx / scale, delta.dy / scale);
-          widget.onUpdatePageOffset(newPageOffset);
-        },
-        onLongPress: () {
-          // optional delete confirmation
-          showDialog(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: const Text('Delete Text?'),
-              content: const Text('Do you want to remove this text overlay?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onDelete();
-                  },
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: Opacity(
-          opacity: widget.overlay.opacity,
-          child: Container(
-            padding: const EdgeInsets.all(2),
-            color: widget.overlay.backgroundColor,
-            child: Text(
-              widget.overlay.text,
-              style: TextStyle(
-                color: widget.overlay.color,
-                fontSize: widget.overlay.fontSize * scale,
-                fontWeight: widget.overlay.bold
-                    ? FontWeight.bold
-                    : FontWeight.normal,
-                fontStyle: widget.overlay.italic
-                    ? FontStyle.italic
-                    : FontStyle.normal,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HighlightWidget extends StatelessWidget {
-  final _HighlightOverlay overlay;
-  final Offset Function(int, Offset) pageToLocal;
-  final double Function(int) effectiveScaleForPage;
-  final VoidCallback onDelete;
-
-  const _HighlightWidget({
-    required this.overlay,
-    required this.pageToLocal,
-    required this.effectiveScaleForPage,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = effectiveScaleForPage(overlay.pageNumber);
-    final topLeft = pageToLocal(
-      overlay.pageNumber,
-      Offset(overlay.rect.left, overlay.rect.top),
-    );
-    final w = overlay.rect.width * scale;
-    final h = overlay.rect.height * scale;
-
-    return Positioned(
-      left: topLeft.dx,
-      top: topLeft.dy,
-      width: w,
-      height: h,
-      child: GestureDetector(
-        onLongPress: onDelete,
-        child: Container(color: overlay.color),
-      ),
-    );
-  }
-}
-
-class _DraggableResizableImage extends StatefulWidget {
-  final _ImageOverlay overlay;
-  final Offset Function(int, Offset) pageToLocal;
-  final double Function(int) effectiveScaleForPage;
-  final void Function(Offset) onUpdatePageOffset;
-  final void Function(double w, double h) onUpdateSize;
-  final VoidCallback onDelete;
-
-  const _DraggableResizableImage({
-    required this.overlay,
-    required this.pageToLocal,
-    required this.effectiveScaleForPage,
-    required this.onUpdatePageOffset,
-    required this.onUpdateSize,
-    required this.onDelete,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  State<_DraggableResizableImage> createState() =>
-      _DraggableResizableImageState();
-}
-
-class _DraggableResizableImageState extends State<_DraggableResizableImage> {
-  late double _initialPageWidth;
-  late double _initialPageHeight;
-  bool _isScaling = false;
-  bool _isDragging = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = widget.effectiveScaleForPage(widget.overlay.pageNumber);
-    final topLeft = widget.pageToLocal(
-      widget.overlay.pageNumber,
-      widget.overlay.pageOffset,
-    );
-    final w = widget.overlay.pageWidth * scale;
-    final h = widget.overlay.pageHeight * scale;
-
-    return Positioned(
-      left: topLeft.dx,
-      top: topLeft.dy,
-      width: w,
-      height: h,
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onLongPress: widget.onDelete,
-        onScaleStart: (details) {
-          // capture base sizes before pinch
-          _initialPageWidth = widget.overlay.pageWidth;
-          _initialPageHeight = widget.overlay.pageHeight;
-          _isScaling = details.pointerCount > 1;
-          _isDragging = details.pointerCount == 1;
-        },
-        onScaleUpdate: (details) {
-          final pointerCount = details.pointerCount;
-          final currentScale = widget.effectiveScaleForPage(
-            widget.overlay.pageNumber,
-          );
-
-          if (pointerCount == 1) {
-            // dragging (single finger) — translate focalPointDelta into page delta
-            final deltaLocal = details.focalPointDelta;
-            final deltaPage = Offset(
-              deltaLocal.dx / currentScale,
-              deltaLocal.dy / currentScale,
-            );
-            widget.onUpdatePageOffset(widget.overlay.pageOffset + deltaPage);
-          } else if (pointerCount >= 2) {
-            // resizing (pinch) — compute from initial sizes (no compounding)
-            final newW = (_initialPageWidth * details.scale).clamp(
-              8.0,
-              10000.0,
-            );
-            // preserve aspect ratio:
-            final aspect = _initialPageHeight / _initialPageWidth;
-            final newH = newW * aspect;
-            widget.onUpdateSize(newW, newH);
-          }
-        },
-        onScaleEnd: (_) {
-          _isScaling = false;
-          _isDragging = false;
-        },
-        child: Image.memory(widget.overlay.bytes, fit: BoxFit.fill),
       ),
     );
   }
