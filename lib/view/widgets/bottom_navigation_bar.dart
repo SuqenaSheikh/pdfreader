@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controller/bottombar_controller.dart';
+import '../../controller/local_controller.dart';
 import '../edit.dart';
 import '../homeview.dart';
 import '../settings.dart';
@@ -13,6 +14,7 @@ class BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BottomBarController controller = Get.put(BottomBarController());
+    final lc = Get.find<LocaleController>();
 
     final List<Widget> screens = [
       const HomeScreen(),
@@ -24,17 +26,17 @@ class BottomBar extends StatelessWidget {
       BottomNavigationBarItem(
         icon: Icon(Icons.home_outlined),
         activeIcon: Icon(Icons.home_rounded),
-        label: 'Home',
+        label: lc.t('home'),
       ),
       BottomNavigationBarItem(
         icon: Icon(Icons.edit_outlined),
         activeIcon: Icon(Icons.edit_rounded),
-        label: 'Editor',
+        label: lc.t('editor'),
       ),
       BottomNavigationBarItem(
         icon: Icon(Icons.settings_outlined),
         activeIcon: Icon(Icons.settings_rounded),
-        label: 'Settings',
+        label: lc.t('settings'),
       ),
     ];
 

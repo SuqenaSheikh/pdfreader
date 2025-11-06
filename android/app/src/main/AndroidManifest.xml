@@ -6,7 +6,7 @@
     <!-- For Android 11+ broad storage access (will show special permission screen). Consider SAF for Play policy compliance. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <application
-        android:label="pdfread"
+        android:label="PDF Reader - PDF Editor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../contents/model/pdf_models.dart';
+import '../../controller/local_controller.dart';
 
 class CommentIconWidget extends StatelessWidget {
   final CommentOverlay overlay;
@@ -21,6 +23,8 @@ class CommentIconWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final localOffset = pageToLocal(overlay.pageNumber, overlay.pageOffset);
     final scale = effectiveScaleForPage(overlay.pageNumber);
+    final lc = Get.find<LocaleController>();
+
 
     return Positioned(
       left: localOffset.dx,
@@ -32,19 +36,19 @@ class CommentIconWidget extends StatelessWidget {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text('Delete Comment?'),
-              content: const Text('Do you want to remove this comment?'),
+              title:  Text(lc.t('deleteComment')),
+              content:  Text(lc.t('deleteQuestion')),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child:  Text(lc.t('cancel')),
                 ),
                 TextButton(
                   onPressed: () async {
                     Navigator.pop(context);
                     await onDelete();
                   },
-                  child: const Text('Delete'),
+                  child:  Text(lc.t('delete')),
                 ),
               ],
             ),

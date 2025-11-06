@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../controller/local_controller.dart';
 
 class PdfEditSheet extends StatefulWidget {
   final Color initialColor;
@@ -33,6 +36,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   bool _bold = false;
   bool _italic = false;
   double _opacity = 1.0;
+  final lc = Get.find<LocaleController>();
 
   @override
   void initState() {
@@ -54,7 +58,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
 
   void _doneAsText() {
     Navigator.of(context).pop({
-      'action': 'text',
+      'action': lc.t('text'),
       'color': _color,
       'bg': _bg,
       'fontSize': _fontSize,
@@ -106,10 +110,10 @@ class _PdfEditSheetState extends State<PdfEditSheet>
 
         TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Text'),
-            Tab(text: 'Signature'),
-            Tab(text: 'Comment'),
+          tabs:  [
+            Tab(text: lc.t('text')),
+            Tab(text: lc.t('signature')),
+            Tab(text: lc.t('comment')),
           ],
         ),
 
@@ -123,9 +127,9 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
-                      const Align(
+                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text('Color'),
+                        child: Text(lc.t('color')),
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -140,9 +144,9 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const Align(
+                       Align(
                         alignment: Alignment.centerLeft,
-                        child: Text('Background'),
+                        child: Text(lc.t('background')),
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -158,7 +162,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text('Size:'),
+                           Text(lc.t('size'+':')),
                           Expanded(
                             child: Slider(
                               min: 8,
@@ -167,7 +171,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                               onChanged: (v) {
                                 setState(() => _fontSize = v);
                                 widget.onLiveChange?.call({
-                                  'action': 'text',
+                                  'action': lc.t('text'),
                                   'color': _color,
                                   'bg': _bg,
                                   'fontSize': _fontSize,
@@ -188,12 +192,12 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                             child: CheckboxListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Bold'),
+                              title: Text(lc.t('bold')),
                               value: _bold,
                               onChanged: (v) {
                                 setState(() => _bold = v ?? false);
                                 widget.onLiveChange?.call({
-                                  'action': 'text',
+                                  'action': lc.t('text'),
                                   'color': _color,
                                   'bg': _bg,
                                   'fontSize': _fontSize,
@@ -209,7 +213,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                             child: CheckboxListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Italic'),
+                              title:  Text(lc.t('italic')),
                               value: _italic,
                               onChanged: (v) {
                                 setState(() => _italic = v ?? false);
@@ -230,7 +234,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text('Opacity:'),
+                           Text(lc.t('opacity'+':')),
                           Expanded(
                             child: Slider(
                               min: 0.0,
@@ -268,13 +272,13 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                     ElevatedButton.icon(
                       onPressed: _doneAsSignature,
                       icon: const Icon(Icons.photo_library),
-                      label: const Text('Upload Signature'),
+                      label: Text(lc.t('uploadSignature')),
                     ),
                     const SizedBox(height: 12),
                     Center(
                       child: Text(
                         textAlign: TextAlign.center,
-                        'Sign on white blank paper. After uploading you can drag signature on the PDF and Save.',
+                        lc.t('signInstructions'),
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
@@ -296,21 +300,21 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Add Hidden Comments',
+                      lc.t('addComments'),
                       style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       textAlign: TextAlign.center,
-                      'Tap on the PDF to add a comment. A comment icon will appear. Tap the icon to view or edit your comment.',
+                      lc.t('commentInstructions'),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
                       onPressed: _doneAsComment,
                       icon: const Icon(Icons.check),
-                      label: const Text('Ready to Add Comment'),
+                      label:  Text(lc.t('readyComment')),
                     ),
                     const Spacer(),
                   ],
@@ -327,7 +331,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     onTap: () {
       setState(() => _color = c);
       widget.onLiveChange?.call({
-        'action': 'text',
+        'action': lc.t('text'),
         'color': _color,
         'bg': _bg,
         'fontSize': _fontSize,
@@ -349,7 +353,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     onTap: () {
       setState(() => _bg = c);
       widget.onLiveChange?.call({
-        'action': 'text',
+        'action': lc.t('text'),
         'color': _color,
         'bg': _bg,
         'fontSize': _fontSize,

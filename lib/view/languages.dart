@@ -6,6 +6,7 @@ import '../contents/services/app_start_service.dart';
 import '../controller/local_controller.dart';
 import 'home.dart';
 import 'homeview.dart';
+import 'onboarding.dart';
 
 class SelectLanguageScreen extends StatefulWidget {
   const SelectLanguageScreen({super.key});
@@ -97,7 +98,6 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Obx(() {
-                // rebuild when localeController.current changes
                 final lc = _localeController;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +123,7 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen> {
                             final isFirstTime = await AppStartService.isFirstLaunch();
                             if (isFirstTime) {
                               await AppStartService.setLaunched();
-                              Get.off(()=>BottomBar());
+                              Get.off(()=>Onboarding());
                             } else {
                               Get.back(); // if from settings
                             }

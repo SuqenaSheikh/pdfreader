@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../contents/model/pdf_models.dart';
+import '../../controller/local_controller.dart';
 
 class DraggableText extends StatefulWidget {
   final TextOverlay overlay;
@@ -27,6 +29,8 @@ class DraggableText extends StatefulWidget {
 class DraggableTextState extends State<DraggableText> {
   Offset _dragStartOffset = Offset.zero;
   Offset _initialPageOffset = Offset.zero;
+  final lc = Get.find<LocaleController>();
+
 
   @override
   Widget build(BuildContext context) {
@@ -58,19 +62,19 @@ class DraggableTextState extends State<DraggableText> {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text('Delete Text?'),
-              content: const Text('Do you want to remove this text overlay?'),
+              title: Text(lc.t('deleteText')),
+              content:  Text(lc.t('deleteQuestion')),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child:  Text(lc.t('cancel')),
                 ),
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
                     widget.onDelete();
                   },
-                  child: const Text('Delete'),
+                  child: Text(lc.t('delete')),
                 ),
               ],
             ),

@@ -1,12 +1,14 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'package:pdfread/view/pdfview.dart';
 import 'package:pdfread/view/widgets/upload_sheet.dart';
 import 'package:intl/intl.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
 import '../contents/themes/app_colors.dart';
+import '../controller/local_controller.dart';
 
 class Editor extends StatefulWidget {
   const Editor({super.key});
@@ -23,6 +25,8 @@ class _EditorState extends State<Editor> {
   bool _showSearch = false;
 
   String _searchQuery = '';
+  final lc = Get.find<LocaleController>();
+
 
   @override
   void initState() {
@@ -62,7 +66,7 @@ class _EditorState extends State<Editor> {
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 10),
               Text(
-                'PDF added to Home',
+                lc.t('addToHome'),
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -136,7 +140,7 @@ class _EditorState extends State<Editor> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Edit Pdf",
+                    lc.t('editPdf'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   GestureDetector(
@@ -172,7 +176,7 @@ class _EditorState extends State<Editor> {
                           controller: _searchController,
                           style: Theme.of(context).textTheme.titleSmall,
                           decoration: InputDecoration(
-                            hintText: 'Search recent files...',
+                            hintText: lc.t('searchFiles'),
                             hintStyle: Theme.of(context).textTheme.titleSmall,
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(

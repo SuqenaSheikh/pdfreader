@@ -48,6 +48,7 @@ dependencies:
   http:
   share_plus: ^10.0.2
   printing: ^5.13.4
+  url_launcher: ^6.3.2
 
 
 

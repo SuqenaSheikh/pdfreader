@@ -1,15 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pdfread/view/languages.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../controller/local_controller.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+  void shareApp() {
+    const packageName = "com.selfcare.stressrelief.anxietyrelief";
+    const appUrl = "https://play.google.com/store/apps/details?id=$packageName";
+
+    Share.share(
+      "Hey! Check out this amazing Stress Relief & Anxiety Relief app:\n$appUrl",
+      subject: "Stress Relief & Anxiety Relief App",
+    );
+  }
+
+  // Function to open privacy policy
+  Future<void> openPrivacyPolicy() async {
+    const url = "https://sites.google.com/view/pdfreaderedito/home";
+    final Uri uri = Uri.parse(url);
+
+    if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final lc = Get.find<LocaleController>();
 
     return Scaffold(
       body: SafeArea(
@@ -23,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Text(
-                    "Settings",
+                    lc.t('settings'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
@@ -34,31 +57,26 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     context,
                     icon: Icons.privacy_tip_outlined,
-                    title: 'Privacy Policy',
-                    onTap: () {
-                      Get.toNamed('/privacy');
-                    },
+                    title: lc.t('privacyPolicy'),
+                    onTap: openPrivacyPolicy
                   ),
                   _buildSettingsTile(
                     context,
                     icon: Icons.star_border_outlined,
-                    title: 'Rate Us',
+                    title: lc.t('rateUs'),
                     onTap: () {
-                      // Handle play store or app store redirection
                     },
                   ),
                   _buildSettingsTile(
                     context,
                     icon: Icons.share_outlined,
-                    title: 'Share App',
-                    onTap: () {
-                      // Handle app sharing
-                    },
+                    title: lc.t('shareApp'),
+                    onTap: shareApp
                   ),
                   _buildSettingsTile(
                     context,
                     icon: Icons.language_outlined,
-                    title: 'Language',
+                    title: lc.t('languages'),
                     onTap: () {
                       Get.to(() => SelectLanguageScreen());
                     },

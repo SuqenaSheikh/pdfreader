@@ -1,4 +1,4 @@
-package com.example.pdfread
+package com.pdfreader.pdffile.pdfeditor.pdfread
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -13,6 +13,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
 import '../contents/model/pdf_models.dart';
+import '../controller/local_controller.dart';
 import 'widgets/pdf_edit_sheet.dart';
 import '../contents/assets/assets.dart';
 import '../contents/services/recent_pdf_storage.dart';
@@ -67,6 +68,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   bool _selectedBold = false;
   bool _selectedItalic = false;
   double _selectedOpacity = 1.0;
+  final lc = Get.find<LocaleController>();
+
 
   // track which text overlay is being edited (null = new text)
   @override
@@ -247,7 +250,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Tap on PDF to add text',
+            lc.t('tapText'),
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -263,7 +266,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Tap on PDF to add a comment',
+            lc.t('tapComment'),
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -389,11 +392,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     if (local != null) return local;
 
     // 2. Fallback: remove.bg (you need a free API key from https://remove.bg)
-    const apiKey = 'PES9omQWNJcs5rnL7YXv547w'; // <-- put your key here
-    if (apiKey.startsWith('YOUR_')) {
-      debugPrint('Warning: remove.bg API key not set – background not removed');
-      return rawBytes;
-    }
+    const apiKey = 'PES9omQWNJcs5rnL7YXv547w';
 
     try {
       final request = http.MultipartRequest(
@@ -422,7 +421,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       debugPrint('remove.bg exception: $e');
     }
 
-    return rawBytes; // worst case – return original
+    return rawBytes;
   }
 
   Future<Uint8List?> _removeWhiteBackgroundLocal(Uint8List inputBytes) async {
@@ -582,7 +581,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Add text'),
+          title:  Text(lc.t('addText')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -590,7 +589,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 controller: tc,
                 style: Theme.of(context).textTheme.titleSmall,
                 decoration: InputDecoration(
-                  hintText: 'Type text',
+                  hintText: lc.t('typeText'),
                   hintStyle: Theme.of(context).textTheme.titleSmall,
                 ),
                 autofocus: true,
@@ -606,7 +605,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   _selectedTool = '';
                 });
               },
-              child: const Text('Cancel'),
+              child:  Text(lc.t('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -640,7 +639,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 // Now open edit sheet to configure styling
                 await _openEditSheetForText(newIndex);
               },
-              child: const Text('Add'),
+              child: Text(lc.t('add')),
             ),
           ],
         );
@@ -702,7 +701,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Add Comment'),
+          title:  Text(lc.t('addComment')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -710,7 +709,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 controller: tc,
                 style: Theme.of(context).textTheme.bodyLarge,
                 decoration: InputDecoration(
-                  hintText: 'Enter your comment...',
+                  hintText: lc.t('enterComment'),
                   hintStyle: Theme.of(context).textTheme.bodyMedium,
                 ),
                 autofocus: true,
@@ -728,7 +727,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   _selectedTool = '';
                 });
               },
-              child: const Text('Cancel'),
+              child: Text(lc.t('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -755,7 +754,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 // Save comments after adding
                 await _saveComments();
               },
-              child: const Text('Add'),
+              child:  Text(lc.t('add')),
             ),
           ],
         );
@@ -815,7 +814,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            'Comment',
+                            lc.t('comment'),
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const Spacer(),
@@ -846,7 +845,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                           controller: tc,
                           style: Theme.of(context).textTheme.bodyLarge,
                           decoration: InputDecoration(
-                            hintText: 'Enter your comment...',
+                            hintText: lc.t('enterComment'),
                             hintStyle: Theme.of(context).textTheme.bodyMedium,
                             border: InputBorder.none,
                           ),
@@ -866,8 +865,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                           await _removeComment(index);
                         },
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text(
-                          'Delete Comment',
+                        label: Text(
+                          lc.t('deleteComment'),
                           style: TextStyle(color: Colors.red),
                         ),
                       ),
@@ -1020,7 +1019,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Please grant storage access in Settings',
+                      lc.t('askPermissions'),
                       style: Theme.of(
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -1040,7 +1039,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Storage permission denied. Saved in app folder.',
+                  lc.t('permissionFallback'),
                   style: Theme.of(
                     context,
                   ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -1069,7 +1068,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Saved to ${outFile.path}',
+            '${lc.t('savedTo')} ${outFile.path}',
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
@@ -1173,7 +1172,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                           controller: _searchController,
                           style: Theme.of(context).textTheme.titleSmall,
                           decoration: InputDecoration(
-                            hintText: 'Search in document...',
+                            hintText: lc.t('searchDocument'),
                             hintStyle: Theme.of(context).textTheme.titleSmall,
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(

@@ -13,6 +13,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
 import 'package:path/path.dart' as p;
 
+import '../controller/local_controller.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -25,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
   String _searchQuery = '';
+  final lc = Get.find<LocaleController>();
+
 
   @override
   void initState() {
@@ -37,26 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _recentPDFs = list);
   }
 
-  // Future<void> _pickAndOpenPDF() async {
-  //   final result = await FilePicker.platform.pickFiles(
-  //     type: FileType.custom,
-  //     allowedExtensions: ['pdf'],
-  //   );
-  //   if (result != null && result.files.single.path != null) {
-  //     final path = result.files.single.path!;
-  //     final name = result.files.single.name;
-  //
-  //     await RecentPDFStorage.addPDF(path, name);
-  //     if (mounted) {
-  //       Navigator.push(
-  //         context,
-  //         MaterialPageRoute(
-  //           builder: (_) => PDFViewerScreen(path: path, name: name, isedit: false),
-  //         ),
-  //       ).then((_) => _loadRecent());
-  //     }
-  //   }
-  // }
   Future<void> _pickAndOpenPDF() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -67,13 +51,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final path = result.files.single.path!;
       final name = result.files.single.name;
 
-      // 1️⃣ Save to SharedPreferences (Recent list)
+      // 1 Save to SharedPreferences (Recent list)
       await RecentPDFStorage.addPDF(path, name);
 
-      // 2️⃣ Reload list so user sees it appear instantly
+      // 2 Reload list so user sees it appear instantly
       await _loadRecent();
 
-      // 3️⃣ Show success message
+      // 3 Show success message
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -84,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 10),
               Text(
-                'PDF added to Home',
+                lc.t('addToHome'),
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -95,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-      // 4️⃣ Wait a bit before opening viewer
+      // 4 Wait a bit before opening viewer
       await Future.delayed(const Duration(seconds: 3));
 
       if (!mounted) return;
@@ -159,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "PDF Reader",
+                    lc.t('pdfReader'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   GestureDetector(
@@ -195,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           controller: _searchController,
                           style: Theme.of(context).textTheme.titleSmall,
                           decoration: InputDecoration(
-                            hintText: 'Search recent files...',
+                            hintText: lc.t('searchFiles'),
                             hintStyle: Theme.of(context).textTheme.titleSmall,
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
@@ -244,12 +228,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'All in One\nPDF Reader',
+                                lc.t('allInOne'),
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               SizedBox(height: 10),
                               Text(
-                                'The easiest way \nto read and edit PDFs.',
+                                  lc.t('readAndEdit'),
+
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
                                       fontWeight: FontWeight.w400,
@@ -273,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Align(
                 alignment: Alignment.topLeft,
                 child: Text(
-                  "Recent Files",
+                  lc.t('recentFiles'),
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontSize: 16),
@@ -286,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: filtered.isEmpty
                     ? Center(
                         child: Text(
-                          "No recent files yet.",
+                          lc.t('noRecentFiles'),
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(color: AppColors.textColor),
                         ),
@@ -380,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Print',
+                lc.t('print'),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
@@ -399,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Rename',
+                lc.t('rename'),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
@@ -417,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Share',
+                lc.t('share'),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
@@ -435,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
-                'Delete',
+                lc.t('delete'),
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               onTap: () async {
@@ -445,6 +430,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+
                     content: Text(
                       'Removed',
                       style: Theme.of(
@@ -494,23 +481,23 @@ class _HomeScreenState extends State<HomeScreen> {
     final newBase = await showDialog<String?>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Rename PDF', style: Theme.of(context).textTheme.bodyLarge),
+        title: Text(lc.t('renamePdf'), style: Theme.of(context).textTheme.bodyLarge),
         content: TextField(
           controller: controller,
           style: Theme.of(context).textTheme.titleSmall,
           decoration: InputDecoration(
-            hintText: 'New name (without .pdf)',
+            hintText: lc.t('newPdf'),
             hintStyle: Theme.of(context).textTheme.titleSmall,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(lc.t('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Rename'),
+            child:  Text(lc.t('rename')),
           ),
         ],
       ),
@@ -533,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Renamed',
+            lc.t('renamedPdf'),
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
