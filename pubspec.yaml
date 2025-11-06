@@ -79,6 +79,7 @@ flutter:
     - assets/svgs/
     - assets/images/
     - assets/images/bghome.png
+    - assets/images/Icon.png
 
 
   fonts:

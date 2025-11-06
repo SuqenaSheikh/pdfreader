@@ -11,8 +11,9 @@ class PdfEditSheet extends StatefulWidget {
   final bool initialItalic;
   final double initialOpacity;
   final void Function(Map<String, dynamic> cfg)? onLiveChange;
+  final bool showTextOptions;
 
-   PdfEditSheet({
+  PdfEditSheet({
     super.key,
     required this.initialColor,
     required this.initialBg,
@@ -21,6 +22,7 @@ class PdfEditSheet extends StatefulWidget {
     required this.initialItalic,
     required this.initialOpacity,
     this.onLiveChange,
+    this.showTextOptions = true,
   });
 
   @override
@@ -55,6 +57,53 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     _tabController.dispose();
     super.dispose();
   }
+
+  Widget _tinyDot(Color c) => GestureDetector(
+    onTap: () {
+      setState(() => _color = c);
+      widget.onLiveChange?.call({
+        'action': lc.t('text'),
+        'color': _color,
+        'bg': _bg,
+        'fontSize': _fontSize,
+        'bold': _bold,
+        'italic': _italic,
+        'opacity': _opacity,
+      });
+    },
+    child: CircleAvatar(
+      backgroundColor: c,
+      radius: 16,
+      child: _color == c
+          ? const Icon(Icons.check, color: Colors.white, size: 16)
+          : null,
+    ),
+  );
+
+  Widget _tinyBg(Color c) => GestureDetector(
+    onTap: () {
+      setState(() => _bg = c);
+      widget.onLiveChange?.call({
+        'action': lc.t('text'),
+        'color': _color,
+        'bg': _bg,
+        'fontSize': _fontSize,
+        'bold': _bold,
+        'italic': _italic,
+        'opacity': _opacity,
+      });
+    },
+    child: Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: c,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: _bg == c ? const Icon(Icons.check, size: 16) : null,
+    ),
+  );
 
   void _doneAsText() {
     Navigator.of(context).pop({
@@ -110,7 +159,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
 
         TabBar(
           controller: _tabController,
-          tabs:  [
+          tabs: [
             Tab(text: lc.t('text')),
             Tab(text: lc.t('signature')),
             Tab(text: lc.t('comment')),
@@ -121,147 +170,158 @@ class _PdfEditSheetState extends State<PdfEditSheet>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // Text options (colors, bg, font size)
-              SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                       Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(lc.t('color')),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _tinyDot(Colors.black),
-                          _tinyDot(Colors.red),
-                          _tinyDot(Colors.blue),
-                          _tinyDot(Colors.green),
-                          _tinyDot(Colors.orange),
-                          _tinyDot(Colors.purple),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                       Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(lc.t('background')),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _tinyBg(Colors.transparent),
-                          _tinyBg(Colors.yellow),
-                          _tinyBg(Colors.orange),
-                          _tinyBg(Colors.pink),
-                          _tinyBg(Colors.lightGreen),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                           Text(lc.t('size'+':')),
-                          Expanded(
-                            child: Slider(
-                              min: 8,
-                              max: 48,
-                              value: _fontSize,
-                              onChanged: (v) {
-                                setState(() => _fontSize = v);
-                                widget.onLiveChange?.call({
-                                  'action': lc.t('text'),
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
+              // Text tab: simplified or full options depending on showTextOptions
+              widget.showTextOptions
+                  ? SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(lc.t('color')),
                             ),
-                          ),
-                          Text('${_fontSize.toInt()}pt'),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(lc.t('bold')),
-                              value: _bold,
-                              onChanged: (v) {
-                                setState(() => _bold = v ?? false);
-                                widget.onLiveChange?.call({
-                                  'action': lc.t('text'),
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                _tinyDot(Colors.black),
+                                _tinyDot(Colors.red),
+                                _tinyDot(Colors.blue),
+                                _tinyDot(Colors.green),
+                                _tinyDot(Colors.orange),
+                                _tinyDot(Colors.purple),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 30),
-                          Expanded(
-                            child: CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title:  Text(lc.t('italic')),
-                              value: _italic,
-                              onChanged: (v) {
-                                setState(() => _italic = v ?? false);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(lc.t('background')),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                           Text(lc.t('opacity'+':')),
-                          Expanded(
-                            child: Slider(
-                              min: 0.0,
-                              max: 1.0,
-                              value: _opacity,
-                              onChanged: (v) {
-                                setState(() => _opacity = v);
-                                widget.onLiveChange?.call({
-                                  'action': 'text',
-                                  'color': _color,
-                                  'bg': _bg,
-                                  'fontSize': _fontSize,
-                                  'bold': _bold,
-                                  'italic': _italic,
-                                  'opacity': _opacity,
-                                });
-                              },
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                _tinyBg(Colors.transparent),
+                                _tinyBg(Colors.yellow),
+                                _tinyBg(Colors.orange),
+                                _tinyBg(Colors.pink),
+                                _tinyBg(Colors.lightGreen),
+                              ],
                             ),
-                          ),
-                          Text('${(_opacity * 100).toInt()}%'),
-                        ],
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Text(lc.t('size' + ':')),
+                                Expanded(
+                                  child: Slider(
+                                    min: 8,
+                                    max: 48,
+                                    value: _fontSize,
+                                    onChanged: (v) {
+                                      setState(() => _fontSize = v);
+                                      widget.onLiveChange?.call({
+                                        'action': lc.t('text'),
+                                        'color': _color,
+                                        'bg': _bg,
+                                        'fontSize': _fontSize,
+                                        'bold': _bold,
+                                        'italic': _italic,
+                                        'opacity': _opacity,
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Text('${_fontSize.toInt()}pt'),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(lc.t('bold')),
+                                    value: _bold,
+                                    onChanged: (v) {
+                                      setState(() => _bold = v ?? false);
+                                      widget.onLiveChange?.call({
+                                        'action': lc.t('text'),
+                                        'color': _color,
+                                        'bg': _bg,
+                                        'fontSize': _fontSize,
+                                        'bold': _bold,
+                                        'italic': _italic,
+                                        'opacity': _opacity,
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 30),
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(lc.t('italic')),
+                                    value: _italic,
+                                    onChanged: (v) {
+                                      setState(() => _italic = v ?? false);
+                                      widget.onLiveChange?.call({
+                                        'action': 'text',
+                                        'color': _color,
+                                        'bg': _bg,
+                                        'fontSize': _fontSize,
+                                        'bold': _bold,
+                                        'italic': _italic,
+                                        'opacity': _opacity,
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Text(lc.t('opacity' + ':')),
+                                Expanded(
+                                  child: Slider(
+                                    min: 0.0,
+                                    max: 1.0,
+                                    value: _opacity,
+                                    onChanged: (v) {
+                                      setState(() => _opacity = v);
+                                      widget.onLiveChange?.call({
+                                        'action': 'text',
+                                        'color': _color,
+                                        'bg': _bg,
+                                        'fontSize': _fontSize,
+                                        'bold': _bold,
+                                        'italic': _italic,
+                                        'opacity': _opacity,
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Text('${(_opacity * 100).toInt()}%'),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                ),
-              ),
+                    )
+                  : Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          lc.t('readyText'),
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
 
               // Signature tab: only upload button (sheet will return 'signature' on Done)
               Padding(
@@ -304,17 +364,12 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                       style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      textAlign: TextAlign.center,
-                      lc.t('commentInstructions'),
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
                       onPressed: _doneAsComment,
                       icon: const Icon(Icons.check),
-                      label:  Text(lc.t('readyComment')),
+                      label: Text(lc.t('readyComment')),
                     ),
                     const Spacer(),
                   ],
@@ -326,51 +381,4 @@ class _PdfEditSheetState extends State<PdfEditSheet>
       ],
     );
   }
-
-  Widget _tinyDot(Color c) => GestureDetector(
-    onTap: () {
-      setState(() => _color = c);
-      widget.onLiveChange?.call({
-        'action': lc.t('text'),
-        'color': _color,
-        'bg': _bg,
-        'fontSize': _fontSize,
-        'bold': _bold,
-        'italic': _italic,
-        'opacity': _opacity,
-      });
-    },
-    child: CircleAvatar(
-      backgroundColor: c,
-      radius: 16,
-      child: _color == c
-          ? const Icon(Icons.check, color: Colors.white, size: 16)
-          : null,
-    ),
-  );
-
-  Widget _tinyBg(Color c) => GestureDetector(
-    onTap: () {
-      setState(() => _bg = c);
-      widget.onLiveChange?.call({
-        'action': lc.t('text'),
-        'color': _color,
-        'bg': _bg,
-        'fontSize': _fontSize,
-        'bold': _bold,
-        'italic': _italic,
-        'opacity': _opacity,
-      });
-    },
-    child: Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: c,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: _bg == c ? const Icon(Icons.check, size: 16) : null,
-    ),
-  );
 }

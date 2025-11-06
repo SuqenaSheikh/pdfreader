@@ -9,6 +9,8 @@ class CommentIconWidget extends StatelessWidget {
   final double Function(int page) effectiveScaleForPage;
   final VoidCallback onTap;
   final Future<void> Function() onDelete;
+  final void Function(Offset newPageOffset)? onUpdatePageOffset;
+  final VoidCallback? onDragEnd;
 
   const CommentIconWidget({
     required this.overlay,
@@ -16,6 +18,8 @@ class CommentIconWidget extends StatelessWidget {
     required this.effectiveScaleForPage,
     required this.onTap,
     required this.onDelete,
+    this.onUpdatePageOffset,
+    this.onDragEnd,
     Key? key,
   }) : super(key: key);
 
@@ -25,38 +29,50 @@ class CommentIconWidget extends StatelessWidget {
     final scale = effectiveScaleForPage(overlay.pageNumber);
     final lc = Get.find<LocaleController>();
 
-
     return Positioned(
       left: localOffset.dx,
       top: localOffset.dy,
       child: GestureDetector(
         onTap: onTap,
+        onPanUpdate: (details) {
+          if (onUpdatePageOffset == null) return;
+          final dxPage = details.delta.dx / scale;
+          final dyPage = details.delta.dy / scale;
+          final newOffset = Offset(
+            overlay.pageOffset.dx + dxPage,
+            overlay.pageOffset.dy + dyPage,
+          );
+          onUpdatePageOffset!(newOffset);
+        },
+        onPanEnd: (_) {
+          if (onDragEnd != null) onDragEnd!();
+        },
         onLongPress: () {
           // Delete confirmation
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              title:  Text(lc.t('deleteComment')),
-              content:  Text(lc.t('deleteQuestion')),
+              title: Text(lc.t('deleteComment')),
+              content: Text(lc.t('deleteQuestion')),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child:  Text(lc.t('cancel')),
+                  child: Text(lc.t('cancel')),
                 ),
                 TextButton(
                   onPressed: () async {
                     Navigator.pop(context);
                     await onDelete();
                   },
-                  child:  Text(lc.t('delete')),
+                  child: Text(lc.t('delete')),
                 ),
               ],
             ),
           );
         },
         child: Container(
-          width: 28 * scale,
-          height: 28 * scale,
+          width: 36 * scale,
+          height: 36 * scale,
           decoration: BoxDecoration(
             color: Colors.amber.shade700,
             shape: BoxShape.circle,
@@ -69,7 +85,7 @@ class CommentIconWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(Icons.comment, size: 16 * scale, color: Colors.white),
+          child: Icon(Icons.comment, size: 20 * scale, color: Colors.white),
         ),
       ),
     );

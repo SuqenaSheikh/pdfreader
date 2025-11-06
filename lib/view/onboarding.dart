@@ -192,31 +192,36 @@ class _OnboardingState extends State<Onboarding> {
                             const SizedBox(height: 30),
 
                             // Continue button
+                            // Continue / Done button
                             Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 17),
-                               child: SizedBox(
-                                  width: double.infinity, // full width
-                                  height: 50, // same height as shown in your image
-                                  child: ElevatedButton(
-                                    onPressed: _goToNextPage,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(context).colorScheme.primary,
-
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      elevation: 0, // flat look
+                              padding: const EdgeInsets.symmetric(horizontal: 17),
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: _goToNextPage,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).colorScheme.primary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child:  Center(
-                                      child: Text(
-                                          lc.t("continue"),
-                                        style:  Theme.of(context).textTheme.titleMedium,
-                                      ),
-                                    ),
+                                    elevation: 0,
+                                    padding: EdgeInsets.zero, // 🔥 remove default padding
+                                    alignment: Alignment.center, // 🔥 ensures text stays centered
                                   ),
-                                )
-
+                                  child: Text(
+                                    lc.t(_currentPage == _pages.length - 1 ? "done" : "continue"),
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(color: Colors.white, height: 1), // 🔥 perfectly center text
+                                  ),
+                                ),
+                              ),
                             ),
+
+
                           ],
                         ),
                       ),

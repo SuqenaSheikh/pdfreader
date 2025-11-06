@@ -231,6 +231,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               initialBold: _selectedBold,
               initialItalic: _selectedItalic,
               initialOpacity: _selectedOpacity,
+              showTextOptions: false,
             ),
           ),
         );
@@ -249,37 +250,14 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
     final action = result['action'] as String?;
     if (action == lc.t('text')) {
-      // NEW WORKFLOW: Just enable text placement, user adds text first
-      setState(() {
-        _selectedTool = lc.t('text');
-        _awaitingTextPlacement = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            lc.t('tapText'),
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-          ),
-        ),
-      );
+      // Immediately open Add Text dialog at viewer center, then reopen sheet for styling
+      final center = await _viewerCenterOffset();
+      await _showAddTextDialog(center);
+      // Sheet to style will be opened by _showAddTextDialog via _openEditSheetForText
     } else if (action == 'comment') {
-      // Enable comment placement mode
-      setState(() {
-        _selectedTool = 'comment';
-        _awaitingCommentPlacement = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            lc.t('tapComment'),
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-          ),
-        ),
-      );
+      // Immediately open Comment dialog at viewer center; user can drag afterward
+      final center = await _viewerCenterOffset();
+      await _showAddCommentDialog(center);
     } else if (action == 'signature') {
       // immediately open image picker (sheet asked to upload signature)
       setState(() {
@@ -340,6 +318,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               initialBold: overlay.bold,
               initialItalic: overlay.italic,
               initialOpacity: overlay.opacity,
+              showTextOptions: true,
               onLiveChange: (cfg) {
                 setState(() {
                   _texts[index] = _texts[index].copyWith(
@@ -733,6 +712,12 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   void _removeHighlight(int index) {
     setState(() => _highlights.removeAt(index));
+  }
+
+  void _updateCommentPosition(int index, Offset newPageOffset) {
+    setState(() {
+      _comments[index] = _comments[index].copyWith(pageOffset: newPageOffset);
+    });
   }
 
   Future<void> _removeComment(int index) async {
@@ -1319,6 +1304,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         effectiveScaleForPage: _effectiveScaleForPage,
                         onTap: () => _showCommentSheet(i),
                         onDelete: () async => await _removeComment(i),
+                        onUpdatePageOffset: (o) => _updateCommentPosition(i, o),
+                        onDragEnd: () async => await _saveComments(),
                       ),
 
                     // ----- loading overlay -----

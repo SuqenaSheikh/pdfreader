@@ -66,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           const Spacer(),
           ///Icon
-          Image.asset(Assets.icon),
+          Image.asset('assets/images/Icon.png', height: 150, width: 150,),
 
           const SizedBox(height: 32),
 

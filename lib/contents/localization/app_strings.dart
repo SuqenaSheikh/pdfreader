@@ -2,6 +2,7 @@ class AppStrings {
   // keys: local code (en, ur, ar, es...), values: map of keys->string
   static const Map<String, Map<String, String>> localized = {
     'en': {
+      'done': 'Done',
       'select_language': 'Select Language',
       'search_language': 'Search Language',
       'all_languages': 'All Languages',
@@ -84,6 +85,7 @@ class AppStrings {
           'Add your digital signature and share documents safely with built-in privacy protection.',
     },
     'ar': {
+      'done': 'تم',
       'select_language': 'اختر اللغة',
       'search_language': 'ابحث عن لغة',
       'all_languages': 'جميع اللغات',
@@ -167,6 +169,7 @@ class AppStrings {
           'أضف توقيعك الرقمي وشارك المستندات بأمان مع حماية خصوصية مدمجة.',
     },
     'zh': {
+      'done': '完成',
       'select_language': '选择语言',
       'search_language': '搜索语言',
       'all_languages': '所有语言',
@@ -247,6 +250,7 @@ class AppStrings {
           '添加数字签名并安全分享文档，内置隐私保护。',
     },
     'de': {
+      'done': 'Fertig',
       'select_language': 'Sprache auswählen',
       'search_language': 'Sprache suchen',
       'all_languages': 'Alle Sprachen',
@@ -330,6 +334,7 @@ class AppStrings {
           'Füge deine digitale Unterschrift hinzu und teile Dokumente sicher – mit integriertem Datenschutz.',
     },
     'fr': {
+      'done': 'Terminé',
       'select_language': 'Choisir la langue',
       'search_language': 'Rechercher une langue',
       'all_languages': 'Toutes les langues',
@@ -414,6 +419,7 @@ class AppStrings {
           'Ajoutez votre signature numérique et partagez vos documents en toute sécurité grâce à la protection de la confidentialité intégrée.',
     },
     'id': {
+      'done':'Selesai' ,
       'select_language': 'Pilih Bahasa',
       'search_language': 'Cari Bahasa',
       'all_languages': 'Semua Bahasa',
@@ -497,6 +503,7 @@ class AppStrings {
           'Tambahkan tanda tangan digital dan bagikan dokumen dengan aman berkat perlindungan privasi bawaan.',
     },
     'ja': {
+      'done': '完了',
       'select_language': '言語を選択',
       'search_language': '言語を検索',
       'all_languages': 'すべての言語',
@@ -577,6 +584,7 @@ class AppStrings {
           'デジタル署名を追加し、組み込みのプライバシー保護で安全に共有できます。',
     },
     'pt': {
+      'done': 'Concluído',
       'select_language': 'Selecionar idioma',
       'search_language': 'Pesquisar idioma',
       'all_languages': 'Todos os idiomas',
@@ -659,6 +667,7 @@ class AppStrings {
           'Adicione sua assinatura digital e compartilhe com segurança, com proteção de privacidade integrada.',
     },
     'ru': {
+      'done': 'Готово',
       'select_language': 'Выберите язык',
       'search_language': 'Поиск языка',
       'all_languages': 'Все языки',
@@ -742,6 +751,8 @@ class AppStrings {
           'Добавляйте цифровую подпись и делитесь документами безопасно — с встроенной защитой конфиденциальности.',
     },
     'tr': {
+      'done':'Tamamlandı' ,
+
       'select_language': 'Dili Seç',
       'search_language': 'Dil Ara',
       'all_languages': 'Tüm Diller',
