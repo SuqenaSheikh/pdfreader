@@ -26,7 +26,12 @@ class PDFViewerScreen extends StatefulWidget {
   final String name;
   final bool isedit;
 
-  const PDFViewerScreen({super.key, required this.path, required this.name, required this.isedit});
+  const PDFViewerScreen({
+    super.key,
+    required this.path,
+    required this.name,
+    required this.isedit,
+  });
 
   @override
   State<PDFViewerScreen> createState() => _PDFViewerScreenState();
@@ -63,13 +68,16 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   bool _awaitingTextPlacement = false;
   bool _awaitingCommentPlacement = false;
 
+  // busy overlay
+  bool _isUploading = false;
+  String? _busyMessage;
+
   // selected text config from bottom sheet
   double _selectedFontSize = 18;
   bool _selectedBold = false;
   bool _selectedItalic = false;
   double _selectedOpacity = 1.0;
   final lc = Get.find<LocaleController>();
-
 
   // track which text overlay is being edited (null = new text)
   @override
@@ -79,8 +87,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     // Listen to zoom and scroll changes to update overlay positions
     _controller.addListener(() {
       if (mounted) {
-        setState(() {
-        });
+        setState(() {});
       }
     });
     _loadPageSizes();
@@ -241,10 +248,10 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     }
 
     final action = result['action'] as String?;
-    if (action == 'text') {
+    if (action == lc.t('text')) {
       // NEW WORKFLOW: Just enable text placement, user adds text first
       setState(() {
-        _selectedTool = 'text';
+        _selectedTool = lc.t('text');
         _awaitingTextPlacement = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -392,33 +399,67 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     if (local != null) return local;
 
     // 2. Fallback: remove.bg (you need a free API key from https://remove.bg)
-    const apiKey = 'PES9omQWNJcs5rnL7YXv547w';
+    const apiKey = 'mgk2f3PTHLCg8SrArLNxm6sL';
 
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.remove.bg/v1.0/removebg'),
-      );
-      request.headers['X-Api-Key'] = apiKey;
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'image_file',
-          rawBytes,
-          filename: 'signature.jpg',
-        ),
-      );
+    // Try up to 2 attempts with longer timeout
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('https://api.remove.bg/v1.0/removebg'),
+        );
+        request.headers['X-Api-Key'] = apiKey;
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image_file',
+            rawBytes,
+            filename: 'signature.jpg',
+          ),
+        );
 
-      final response = await request.send().timeout(
-        const Duration(seconds: 15),
-      );
-      if (response.statusCode == 200) {
-        final bytes = await response.stream.toBytes();
-        return bytes;
-      } else {
-        debugPrint('remove.bg error ${response.statusCode}');
+        final response = await request.send().timeout(
+          const Duration(seconds: 30),
+        );
+        if (response.statusCode == 200) {
+          final bytes = await response.stream.toBytes();
+          return bytes;
+        } else {
+          debugPrint('remove.bg error ${response.statusCode}');
+          if (attempt == 2) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Background removal failed (${response.statusCode}). Using original image.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                  ),
+                ),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('remove.bg exception: $e');
+        if (attempt == 2) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Background removal timed out. Using original image.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                ),
+              ),
+            );
+          }
+        } else {
+          // small delay before retry
+          await Future.delayed(const Duration(milliseconds: 600));
+        }
       }
-    } catch (e) {
-      debugPrint('remove.bg exception: $e');
     }
 
     return rawBytes;
@@ -493,8 +534,23 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
     final raw = await File(xfile.path).readAsBytes();
 
-    // This now uses local → remove.bg fallback
-    final cleaned = await _removeSignatureBackground(raw) ?? raw;
+    setState(() {
+      _isUploading = true;
+      _busyMessage = lc.t('processingSignature');
+    });
+    Uint8List cleaned;
+    try {
+      // This now uses local → remove.bg fallback
+      final out = await _removeSignatureBackground(raw);
+      cleaned = out ?? raw;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _busyMessage = null;
+        });
+      }
+    }
 
     // … rest of your code unchanged …
     final center = await _viewerCenterOffset();
@@ -551,7 +607,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final localPos = _getLocalPosition(details.globalPosition);
     if (localPos == null) return;
 
-    if (_selectedTool == 'text' && _awaitingTextPlacement) {
+    if (_selectedTool == lc.t('text') && _awaitingTextPlacement) {
       _showAddTextDialog(localPos);
       // after adding one text overlay, keep placement off so user can choose again via bottom sheet
       setState(() {
@@ -581,7 +637,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title:  Text(lc.t('addText')),
+          title: Text(lc.t('addText')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -605,7 +661,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   _selectedTool = '';
                 });
               },
-              child:  Text(lc.t('cancel')),
+              child: Text(lc.t('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -701,7 +757,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title:  Text(lc.t('addComment')),
+          title: Text(lc.t('addComment')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -754,7 +810,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 // Save comments after adding
                 await _saveComments();
               },
-              child:  Text(lc.t('add')),
+              child: Text(lc.t('add')),
             ),
           ],
         );
@@ -1079,8 +1135,11 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) =>
-                PDFViewerScreen(path: outFile.path, name: widget.name,isedit: true),
+            builder: (_) => PDFViewerScreen(
+              path: outFile.path,
+              name: widget.name,
+              isedit: true,
+            ),
           ),
         );
       }
@@ -1136,17 +1195,19 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                       ),
                       const SizedBox(width: 12),
                       // open the edit sheet
-                      widget.isedit?
-                      GestureDetector(
-                        onTap: _openEditSheet,
-                        child: SvgPicture.asset(Assets.fileEdit),
-                      ):SizedBox(width: 0,),
+                      widget.isedit
+                          ? GestureDetector(
+                              onTap: _openEditSheet,
+                              child: SvgPicture.asset(Assets.fileEdit),
+                            )
+                          : SizedBox(width: 0),
                       const SizedBox(width: 6),
-                      widget.isedit?
-                      IconButton(
-                        onPressed: _savePdfWithChanges,
-                        icon: const Icon(Icons.save),
-                      ):SizedBox(width: 0,),
+                      widget.isedit
+                          ? IconButton(
+                              onPressed: _savePdfWithChanges,
+                              icon: const Icon(Icons.save),
+                            )
+                          : SizedBox(width: 0),
                     ],
                   ),
                 ],
@@ -1258,6 +1319,31 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         effectiveScaleForPage: _effectiveScaleForPage,
                         onTap: () => _showCommentSheet(i),
                         onDelete: () async => await _removeComment(i),
+                      ),
+
+                    // ----- loading overlay -----
+                    if (_isUploading)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withOpacity(0.35),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 12),
+                                if (_busyMessage != null)
+                                  Text(
+                                    _busyMessage!,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(color: Colors.white),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                   ],
                 ),
