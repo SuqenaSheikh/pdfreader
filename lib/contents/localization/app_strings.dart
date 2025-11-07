@@ -71,6 +71,8 @@ class AppStrings {
       'addComments': 'Add Hidden Comments',
       'commentInstructions':
           'Tap on the PDF to add a comment. A comment icon will appear. Tap the icon to view or edit your comment.',
+      'textInstructions': 'Add text by tapping "Ready to Add Text".',
+      'readyText': 'Ready to Add Text',
       'readyComment': 'Ready to Add Comment',
       'skip': 'Skip',
       'continue': 'Continue',
@@ -155,6 +157,8 @@ class AppStrings {
       'addComments': 'إضافة تعليقات مخفية',
       'commentInstructions':
           'انقر على PDF لإضافة تعليق. سيظهر رمز تعليق. انقر على الرمز لعرض أو تعديل تعليقك.',
+      'textInstructions': 'أضف نصاً بالنقر على "جاهز لإضافة نص".',
+      'readyText': 'جاهز لإضافة نص',
       'readyComment': 'جاهز لإضافة تعليق',
       'skip': 'تخطي',
       'continue': 'متابعة',
@@ -236,6 +240,8 @@ class AppStrings {
       'signInstructions': '在白纸上签名。上传后可以将签名拖到 PDF 上并保存。',
       'addComments': '添加隐藏评论',
       'commentInstructions': '点击 PDF 添加评论。将出现评论图标。点击图标查看或编辑评论。',
+      'textInstructions': '点击“准备添加文本”即可添加文本。',
+      'readyText': '准备添加文本',
       'readyComment': '准备添加评论',
       'skip': '跳过',
       'continue': '继续',
@@ -320,6 +326,9 @@ class AppStrings {
       'addComments': 'Versteckte Kommentare hinzufügen',
       'commentInstructions':
           'Tippe auf das PDF, um einen Kommentar hinzuzufügen. Tippe auf das Symbol, um ihn anzusehen oder zu bearbeiten.',
+      'textInstructions':
+          'Füge Text hinzu, indem du auf „Bereit, Text hinzuzufügen“ tippst.',
+      'readyText': 'Bereit, Text hinzuzufügen',
       'readyComment': 'Bereit, einen Kommentar hinzuzufügen',
       'skip': 'Überspringen',
       'continue': 'Weiter',
@@ -405,6 +414,9 @@ class AppStrings {
       'addComments': 'Ajouter des commentaires cachés',
       'commentInstructions':
           'Touchez le PDF pour ajouter un commentaire. Touchez l’icône pour voir ou modifier.',
+      'textInstructions':
+          'Ajoutez du texte en touchant « Prêt à ajouter du texte ».',
+      'readyText': 'Prêt à ajouter du texte',
       'readyComment': 'Prêt à ajouter un commentaire',
       'skip': 'Passer',
       'continue': 'Continuer',
@@ -419,7 +431,7 @@ class AppStrings {
           'Ajoutez votre signature numérique et partagez vos documents en toute sécurité grâce à la protection de la confidentialité intégrée.',
     },
     'id': {
-      'done':'Selesai' ,
+      'done': 'Selesai',
       'select_language': 'Pilih Bahasa',
       'search_language': 'Cari Bahasa',
       'all_languages': 'Semua Bahasa',
@@ -489,6 +501,9 @@ class AppStrings {
       'addComments': 'Tambahkan Komentar Tersembunyi',
       'commentInstructions':
           'Ketuk PDF untuk menambahkan komentar. Ketuk ikon untuk melihat atau mengeditnya.',
+      'textInstructions':
+          'Ketuk "Siap Menambahkan Teks", lalu ketuk di mana saja pada PDF untuk menempatkan teks.',
+      'readyText': 'Siap Menambahkan Teks',
       'readyComment': 'Siap Menambahkan Komentar',
       'skip': 'Lewati',
       'continue': 'Lanjut',
@@ -570,6 +585,8 @@ class AppStrings {
       'signInstructions': '白い紙に署名してください。アップロード後、PDF 上に配置して保存できます。',
       'addComments': '非表示コメントを追加',
       'commentInstructions': 'PDF をタップしてコメントを追加。アイコンをタップして表示/編集します。',
+      'textInstructions': '「テキストを追加する準備完了」をタップしてテキストを追加します。',
+      'readyText': 'テキストを追加する準備完了',
       'readyComment': 'コメントの追加準備完了',
       'skip': 'スキップ',
       'continue': '続行',
@@ -653,6 +670,9 @@ class AppStrings {
       'addComments': 'Adicionar Comentários Ocultos',
       'commentInstructions':
           'Toque no PDF para adicionar um comentário. Toque no ícone para ver ou editar.',
+      'textInstructions':
+          'Adicione texto tocando em "Pronto para adicionar texto".',
+      'readyText': 'Pronto para adicionar texto',
       'readyComment': 'Pronto para adicionar comentário',
       'skip': 'Pular',
       'continue': 'Continuar',
@@ -736,7 +756,9 @@ class AppStrings {
           'Подпишите на белой бумаге. После загрузки разместите подпись на PDF и сохраните.',
       'addComments': 'Добавить скрытые комментарии',
       'commentInstructions':
-          'Нажмите на PDF, чтобы добавить комментарий. Нажмите на значок для просмотра/редактирования.',
+          'Нажмите на PDF, чтобы добавить комментарий. Появится значок комментария. Нажмите на значок, чтобы просмотреть или изменить комментарий.',
+      'textInstructions': 'Добавьте текст, нажав «Готово к добавлению текста».',
+      'readyText': 'Готово к добавлению текста',
       'readyComment': 'Готово к добавлению комментария',
       'skip': 'Пропустить',
       'continue': 'Продолжить',
@@ -751,7 +773,7 @@ class AppStrings {
           'Добавляйте цифровую подпись и делитесь документами безопасно — с встроенной защитой конфиденциальности.',
     },
     'tr': {
-      'done':'Tamamlandı' ,
+      'done': 'Tamamlandı',
 
       'select_language': 'Dili Seç',
       'search_language': 'Dil Ara',
@@ -822,6 +844,9 @@ class AppStrings {
       'addComments': 'Gizli Yorumlar Ekle',
       'commentInstructions':
           'Yorum eklemek için PDF’ye dokunun. Görmek/düzenlemek için simgeye dokunun.',
+      'textInstructions':
+          '“Metin eklemeye hazır”a dokunun ve ardından metni yerleştirmek için PDF üzerinde herhangi bir yere dokunun.',
+      'readyText': 'Metin eklemeye hazır',
       'readyComment': 'Yorum eklemeye hazır',
       'skip': 'Atla',
       'continue': 'Devam et',

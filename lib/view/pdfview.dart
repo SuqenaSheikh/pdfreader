@@ -60,14 +60,11 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final List<HighlightOverlay> _highlights = [];
   final List<TextOverlay> _texts = [];
   final List<ImageOverlay> _images = [];
-  // live draft text overlay while editing
-  TextOverlay? _draftText;
 
   // page metrics
   final List<Size> _pageSizes = [];
   final double _pageSpacing = 8.0;
 
-  bool _awaitingTextPlacement = false;
   bool _awaitingCommentPlacement = false;
 
   // busy overlay
@@ -202,6 +199,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // ---------------- edit sheet ----------------
   Future<void> _openEditSheet() async {
+    _stopInlineEditing(removeIfEmpty: false);
     // show sheet and wait for result. The sheet returns a Map with chosen config or null on cancel.
     final result = await showModalBottomSheet<Map<String, dynamic>?>(
       context: context,
@@ -239,55 +237,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   initialItalic: _selectedItalic,
                   initialOpacity: _selectedOpacity,
                   initialText: '',
-                  showTextOptions: true,
+                  showTextOptions: false,
                   showTextInput: false,
-                  onLiveChange: (cfg) async {
-                    if (_pageSizes.isEmpty) await _loadPageSizes();
-                    if (_draftText == null) {
-                      final center = await _viewerCenterOffset();
-                      final hit = _localToPage(center);
-                      _draftText = TextOverlay(
-                        pageNumber: hit.page,
-                        text: '',
-                        color: _selectedColor,
-                        fontSize: _selectedFontSize,
-                        backgroundColor: _selectedBgColor,
-                        bold: _selectedBold,
-                        italic: _selectedItalic,
-                        opacity: _selectedOpacity,
-                        pageOffset: hit.pagePoint,
-                      );
-                    }
-                    setState(() {
-                      _draftText = _draftText!.copyWith(
-                        color: (cfg['color'] as Color?) ?? _draftText!.color,
-                        backgroundColor:
-                            (cfg['bg'] as Color?) ??
-                            _draftText!.backgroundColor,
-                        fontSize:
-                            (cfg['fontSize'] as double?) ??
-                            _draftText!.fontSize,
-                        bold: (cfg['bold'] as bool?) ?? _draftText!.bold,
-                        italic: (cfg['italic'] as bool?) ?? _draftText!.italic,
-                        opacity:
-                            (cfg['opacity'] as double?) ?? _draftText!.opacity,
-                      );
-                      final tv = cfg['textValue'] as String?;
-                      if (tv != null) {
-                        _draftText = TextOverlay(
-                          pageNumber: _draftText!.pageNumber,
-                          text: tv,
-                          color: _draftText!.color,
-                          fontSize: _draftText!.fontSize,
-                          backgroundColor: _draftText!.backgroundColor,
-                          bold: _draftText!.bold,
-                          italic: _draftText!.italic,
-                          opacity: _draftText!.opacity,
-                          pageOffset: _draftText!.pageOffset,
-                        );
-                      }
-                    });
-                  },
                 ),
               ),
             ),
@@ -300,9 +251,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       // user cancelled sheet
       setState(() {
         _selectedTool = '';
-        _awaitingTextPlacement = false;
         _awaitingCommentPlacement = false;
-        _draftText = null;
         _editingTextIndex = null;
       });
       return;
@@ -317,66 +266,18 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       final chosenBold = (result['bold'] as bool?) ?? _selectedBold;
       final chosenItalic = (result['italic'] as bool?) ?? _selectedItalic;
       final chosenOpacity = (result['opacity'] as double?) ?? _selectedOpacity;
-
-      final tv = (result['textValue'] as String?)?.trim();
-
-      if (tv != null && tv.isNotEmpty) {
-        if (_pageSizes.isEmpty) await _loadPageSizes();
-        final center = await _viewerCenterOffset();
-        final hit = _localToPage(center);
-        final overlay = TextOverlay(
-          pageNumber: hit.page,
-          text: tv,
-          color: chosenColor,
-          fontSize: chosenFontSize,
-          backgroundColor: chosenBg,
-          bold: chosenBold,
-          italic: chosenItalic,
-          opacity: chosenOpacity,
-          pageOffset: hit.pagePoint,
-        );
-        setState(() {
-          _texts.add(overlay);
-          _selectedColor = chosenColor;
-          _selectedBgColor = chosenBg;
-          _selectedFontSize = chosenFontSize;
-          _selectedBold = chosenBold;
-          _selectedItalic = chosenItalic;
-          _selectedOpacity = chosenOpacity;
-          _selectedTool = lc.t('text');
-          _awaitingTextPlacement = false;
-          _awaitingCommentPlacement = false;
-          _draftText = null;
-          _editingTextIndex = _texts.length - 1;
-        });
-        _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
-      } else {
-        setState(() {
-          _selectedColor = chosenColor;
-          _selectedBgColor = chosenBg;
-          _selectedFontSize = chosenFontSize;
-          _selectedBold = chosenBold;
-          _selectedItalic = chosenItalic;
-          _selectedOpacity = chosenOpacity;
-          _selectedTool = lc.t('text');
-          _awaitingTextPlacement = true;
-          _awaitingCommentPlacement = false;
-          _draftText = null;
-          _editingTextIndex = null;
-        });
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 2),
-            content: Text(
-              'Tap on the document to add your text.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-            ),
-          ),
-        );
-      }
+      setState(() {
+        _selectedColor = chosenColor;
+        _selectedBgColor = chosenBg;
+        _selectedFontSize = chosenFontSize;
+        _selectedBold = chosenBold;
+        _selectedItalic = chosenItalic;
+        _selectedOpacity = chosenOpacity;
+        _selectedTool = '';
+        _awaitingCommentPlacement = false;
+        _editingTextIndex = null;
+      });
+      await _promptForTextAndPlace();
     } else if (action == 'comment') {
       // Immediately open Comment dialog at viewer center; user can drag afterward
       final center = await _viewerCenterOffset();
@@ -392,11 +293,83 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       // unknown or cancel
       setState(() {
         _selectedTool = '';
-        _awaitingTextPlacement = false;
         _awaitingCommentPlacement = false;
         _editingTextIndex = null;
       });
     }
+  }
+
+  Future<void> _promptForTextAndPlace() async {
+    final TextEditingController tc = TextEditingController();
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(lc.t('addText')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: tc,
+                style: Theme.of(context).textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: lc.t('typeText'),
+                  hintStyle: Theme.of(context).textTheme.bodyMedium,
+                ),
+                autofocus: true,
+                maxLines: null,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+              },
+              child: Text(lc.t('cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final text = tc.text.trim();
+                if (text.isEmpty) return;
+                Navigator.pop(ctx);
+
+                if (_pageSizes.isEmpty) {
+                  await _loadPageSizes();
+                }
+                final center = await _viewerCenterOffset();
+                final hit = _localToPage(center);
+
+                final overlay = TextOverlay(
+                  pageNumber: hit.page,
+                  text: text,
+                  color: _selectedColor,
+                  fontSize: _selectedFontSize,
+                  backgroundColor: _selectedBgColor,
+                  bold: _selectedBold,
+                  italic: _selectedItalic,
+                  opacity: _selectedOpacity,
+                  pageOffset: hit.pagePoint,
+                );
+
+                final newIndex = _texts.length;
+                setState(() {
+                  _texts.add(overlay);
+                  _selectedTool = '';
+                });
+
+                await Future.delayed(Duration.zero);
+                if (!mounted) return;
+                _openEditSheetForText(newIndex);
+              },
+              child: Text(lc.t('add')),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Open edit sheet for existing text overlay
@@ -505,7 +478,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     if (local != null) return local;
 
     // 2. Fallback: remove.bg (you need a free API key from https://remove.bg)
-    const apiKey = '6uEBCBVFs6iZ6hrSX4f9ZV2T';
+    const apiKey = 'VS9yVMVg51uT8ruC3ZUcw8Ar';
 
     // Try up to 2 attempts with longer timeout
     for (int attempt = 1; attempt <= 2; attempt++) {
@@ -710,15 +683,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // ---------------- place text on tap ----------------
   void _onViewerTap(TapUpDetails details) {
-    if (_editingTextIndex != null && !_awaitingTextPlacement) {
+    if (_editingTextIndex != null) {
       _stopInlineEditing();
     }
     final localPos = _getLocalPosition(details.globalPosition);
     if (localPos == null) return;
 
-    if (_selectedTool == lc.t('text') && _awaitingTextPlacement) {
-      _placeTextInline(localPos);
-    } else if (_selectedTool == 'comment' && _awaitingCommentPlacement) {
+    if (_selectedTool == 'comment' && _awaitingCommentPlacement) {
       _showAddCommentDialog(localPos);
       // after adding one comment, keep placement off so user can choose again via bottom sheet
       setState(() {
@@ -732,34 +703,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     final box = _viewerKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return null;
     return box.globalToLocal(global);
-  }
-
-  Future<void> _placeTextInline(Offset pos) async {
-    if (_pageSizes.isEmpty) {
-      await _loadPageSizes();
-    }
-
-    final hit = _localToPage(pos);
-    final overlay = TextOverlay(
-      pageNumber: hit.page,
-      text: '',
-      color: _selectedColor,
-      fontSize: _selectedFontSize,
-      backgroundColor: _selectedBgColor,
-      bold: _selectedBold,
-      italic: _selectedItalic,
-      opacity: _selectedOpacity,
-      pageOffset: hit.pagePoint,
-    );
-
-    final newIndex = _texts.length;
-    setState(() {
-      _texts.add(overlay);
-      _awaitingTextPlacement = false;
-      _selectedTool = lc.t('text');
-    });
-
-    _startEditingText(newIndex);
   }
 
   // ---------------- drag & edit overlays ----------------
@@ -807,13 +750,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       _editingTextIndex = null;
     });
     FocusScope.of(context).unfocus();
-  }
-
-  void _updateDraftTextPosition(Offset newPageOffset) {
-    if (_draftText == null) return;
-    setState(() {
-      _draftText = _draftText!.copyWith(pageOffset: newPageOffset);
-    });
   }
 
   void _removeText(int index) {
@@ -1328,14 +1264,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         child: SvgPicture.asset(Assets.search),
                       ),
                       const SizedBox(width: 12),
-                      // open the edit sheet
-                      widget.isedit
-                          ? GestureDetector(
-                              onTap: _openEditSheet,
-                              child: SvgPicture.asset(Assets.fileEdit),
-                            )
-                          : SizedBox(width: 0),
-                      const SizedBox(width: 6),
                       widget.isedit
                           ? IconButton(
                               onPressed: _savePdfWithChanges,
@@ -1436,21 +1364,6 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         onTextChanged: (value) => _updateTextContent(i, value),
                         onEditingComplete: () => _finishEditingText(i),
                         isEditing: _editingTextIndex == i,
-                      ),
-
-                    // ----- live draft text overlay -----
-                    if (_draftText != null)
-                      DraggableText(
-                        overlay: _draftText!,
-                        pageToLocal: _pageToLocal,
-                        effectiveScaleForPage: _effectiveScaleForPage,
-                        onUpdatePageOffset: _updateDraftTextPosition,
-                        onDelete: () => setState(() => _draftText = null),
-                        onTap: () {},
-                        onStartEditing: () {},
-                        onTextChanged: (_) {},
-                        onEditingComplete: () {},
-                        isEditing: false,
                       ),
 
                     // ----- signature overlays (now resizable) -----

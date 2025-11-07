@@ -349,14 +349,30 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         ),
                       ),
                     )
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          lc.t('readyText'),
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
+                  : Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          const Spacer(),
+                          Icon(
+                            Icons.text_fields,
+                            size: 48,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            lc.t('textInstructions'),
+                            style: Theme.of(context).textTheme.titleLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _doneAsText,
+                            icon: const Icon(Icons.check),
+                            label: Text(lc.t('readyText')),
+                          ),
+                          const Spacer(),
+                        ],
                       ),
                     ),
 

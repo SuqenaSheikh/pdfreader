@@ -9,12 +9,12 @@ import '../controller/local_controller.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
   void shareApp() {
-    const packageName = "com.selfcare.stressrelief.anxietyrelief";
+    const packageName = "com.pdfreader.pdffile.pdfeditor";
     const appUrl = "https://play.google.com/store/apps/details?id=$packageName";
 
     Share.share(
-      "Hey! Check out this amazing Stress Relief & Anxiety Relief app:\n$appUrl",
-      subject: "Stress Relief & Anxiety Relief App",
+      "Hey! Check out this amazing Stress PDF reader app:\n$appUrl",
+      subject: "PDF Reader and Pdf Editor solution",
     );
   }
 
@@ -64,7 +64,13 @@ class SettingsScreen extends StatelessWidget {
                     context,
                     icon: Icons.star_border_outlined,
                     title: lc.t('rateUs'),
-                    onTap: () {
+                    onTap: ()  async {
+                      const packageName = "com.pdfreader.pdffile.pdfeditor";
+                      final Uri uri = Uri.parse("https://play.google.com/store/apps/details?id=$packageName");
+
+                      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                        throw 'Could not launch $uri';
+                      }
                     },
                   ),
                   _buildSettingsTile(
