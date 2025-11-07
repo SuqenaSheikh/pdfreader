@@ -60,6 +60,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   final List<HighlightOverlay> _highlights = [];
   final List<TextOverlay> _texts = [];
   final List<ImageOverlay> _images = [];
+  // live draft text overlay while editing
+  TextOverlay? _draftText;
 
   // page metrics
   final List<Size> _pageSizes = [];
@@ -79,7 +81,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   double _selectedOpacity = 1.0;
   final lc = Get.find<LocaleController>();
 
-  // track which text overlay is being edited (null = new text)
+  int? _editingTextIndex;
   @override
   void initState() {
     super.initState();
@@ -207,31 +209,87 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
       builder: (ctx) {
-        return FractionallySizedBox(
-          heightFactor: 0.55,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
+        final kb = MediaQuery.of(ctx).viewInsets.bottom;
+        return GestureDetector(
+          onTap: () => FocusScope.of(ctx).unfocus(),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: kb),
+            child: FractionallySizedBox(
+              heightFactor: 0.55,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: PdfEditSheet(
-              // initial values passed for convenience
-              initialColor: _selectedColor,
-              initialBg: _selectedBgColor,
-              initialFontSize: _selectedFontSize,
-              initialBold: _selectedBold,
-              initialItalic: _selectedItalic,
-              initialOpacity: _selectedOpacity,
-              showTextOptions: false,
+                child: PdfEditSheet(
+                  // initial values passed for convenience
+                  initialColor: _selectedColor,
+                  initialBg: _selectedBgColor,
+                  initialFontSize: _selectedFontSize,
+                  initialBold: _selectedBold,
+                  initialItalic: _selectedItalic,
+                  initialOpacity: _selectedOpacity,
+                  initialText: '',
+                  showTextOptions: true,
+                  showTextInput: false,
+                  onLiveChange: (cfg) async {
+                    if (_pageSizes.isEmpty) await _loadPageSizes();
+                    if (_draftText == null) {
+                      final center = await _viewerCenterOffset();
+                      final hit = _localToPage(center);
+                      _draftText = TextOverlay(
+                        pageNumber: hit.page,
+                        text: '',
+                        color: _selectedColor,
+                        fontSize: _selectedFontSize,
+                        backgroundColor: _selectedBgColor,
+                        bold: _selectedBold,
+                        italic: _selectedItalic,
+                        opacity: _selectedOpacity,
+                        pageOffset: hit.pagePoint,
+                      );
+                    }
+                    setState(() {
+                      _draftText = _draftText!.copyWith(
+                        color: (cfg['color'] as Color?) ?? _draftText!.color,
+                        backgroundColor:
+                            (cfg['bg'] as Color?) ??
+                            _draftText!.backgroundColor,
+                        fontSize:
+                            (cfg['fontSize'] as double?) ??
+                            _draftText!.fontSize,
+                        bold: (cfg['bold'] as bool?) ?? _draftText!.bold,
+                        italic: (cfg['italic'] as bool?) ?? _draftText!.italic,
+                        opacity:
+                            (cfg['opacity'] as double?) ?? _draftText!.opacity,
+                      );
+                      final tv = cfg['textValue'] as String?;
+                      if (tv != null) {
+                        _draftText = TextOverlay(
+                          pageNumber: _draftText!.pageNumber,
+                          text: tv,
+                          color: _draftText!.color,
+                          fontSize: _draftText!.fontSize,
+                          backgroundColor: _draftText!.backgroundColor,
+                          bold: _draftText!.bold,
+                          italic: _draftText!.italic,
+                          opacity: _draftText!.opacity,
+                          pageOffset: _draftText!.pageOffset,
+                        );
+                      }
+                    });
+                  },
+                ),
+              ),
             ),
           ),
         );
@@ -244,16 +302,81 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _selectedTool = '';
         _awaitingTextPlacement = false;
         _awaitingCommentPlacement = false;
+        _draftText = null;
+        _editingTextIndex = null;
       });
       return;
     }
 
     final action = result['action'] as String?;
     if (action == lc.t('text')) {
-      // Immediately open Add Text dialog at viewer center, then reopen sheet for styling
-      final center = await _viewerCenterOffset();
-      await _showAddTextDialog(center);
-      // Sheet to style will be opened by _showAddTextDialog via _openEditSheetForText
+      final chosenColor = result['color'] as Color? ?? _selectedColor;
+      final chosenBg = result['bg'] as Color? ?? _selectedBgColor;
+      final chosenFontSize =
+          (result['fontSize'] as double?) ?? _selectedFontSize;
+      final chosenBold = (result['bold'] as bool?) ?? _selectedBold;
+      final chosenItalic = (result['italic'] as bool?) ?? _selectedItalic;
+      final chosenOpacity = (result['opacity'] as double?) ?? _selectedOpacity;
+
+      final tv = (result['textValue'] as String?)?.trim();
+
+      if (tv != null && tv.isNotEmpty) {
+        if (_pageSizes.isEmpty) await _loadPageSizes();
+        final center = await _viewerCenterOffset();
+        final hit = _localToPage(center);
+        final overlay = TextOverlay(
+          pageNumber: hit.page,
+          text: tv,
+          color: chosenColor,
+          fontSize: chosenFontSize,
+          backgroundColor: chosenBg,
+          bold: chosenBold,
+          italic: chosenItalic,
+          opacity: chosenOpacity,
+          pageOffset: hit.pagePoint,
+        );
+        setState(() {
+          _texts.add(overlay);
+          _selectedColor = chosenColor;
+          _selectedBgColor = chosenBg;
+          _selectedFontSize = chosenFontSize;
+          _selectedBold = chosenBold;
+          _selectedItalic = chosenItalic;
+          _selectedOpacity = chosenOpacity;
+          _selectedTool = lc.t('text');
+          _awaitingTextPlacement = false;
+          _awaitingCommentPlacement = false;
+          _draftText = null;
+          _editingTextIndex = _texts.length - 1;
+        });
+        _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
+      } else {
+        setState(() {
+          _selectedColor = chosenColor;
+          _selectedBgColor = chosenBg;
+          _selectedFontSize = chosenFontSize;
+          _selectedBold = chosenBold;
+          _selectedItalic = chosenItalic;
+          _selectedOpacity = chosenOpacity;
+          _selectedTool = lc.t('text');
+          _awaitingTextPlacement = true;
+          _awaitingCommentPlacement = false;
+          _draftText = null;
+          _editingTextIndex = null;
+        });
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 2),
+            content: Text(
+              'Tap on the document to add your text.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+            ),
+          ),
+        );
+      }
     } else if (action == 'comment') {
       // Immediately open Comment dialog at viewer center; user can drag afterward
       final center = await _viewerCenterOffset();
@@ -271,14 +394,17 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         _selectedTool = '';
         _awaitingTextPlacement = false;
         _awaitingCommentPlacement = false;
+        _editingTextIndex = null;
       });
     }
   }
 
   // Open edit sheet for existing text overlay
   Future<void> _openEditSheetForText(int index) async {
+    _stopInlineEditing(removeIfEmpty: false);
+    FocusScope.of(context).unfocus();
+    if (index < 0 || index >= _texts.length) return;
     final overlay = _texts[index];
-    // Make sure the text is visible above the bottom sheet
     _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
     setState(() {
       _selectedColor = overlay.color;
@@ -319,20 +445,22 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
               initialItalic: overlay.italic,
               initialOpacity: overlay.opacity,
               showTextOptions: true,
+              showTextInput: false,
               onLiveChange: (cfg) {
+                if (index < 0 || index >= _texts.length) return;
                 setState(() {
-                  _texts[index] = _texts[index].copyWith(
-                    color: (cfg['color'] as Color?) ?? _texts[index].color,
+                  final current = _texts[index];
+                  _texts[index] = current.copyWith(
+                    color: (cfg['color'] as Color?) ?? current.color,
                     backgroundColor:
-                        (cfg['bg'] as Color?) ?? _texts[index].backgroundColor,
-                    fontSize:
-                        (cfg['fontSize'] as double?) ?? _texts[index].fontSize,
-                    bold: (cfg['bold'] as bool?) ?? _texts[index].bold,
-                    italic: (cfg['italic'] as bool?) ?? _texts[index].italic,
-                    opacity:
-                        (cfg['opacity'] as double?) ?? _texts[index].opacity,
+                        (cfg['bg'] as Color?) ?? current.backgroundColor,
+                    fontSize: (cfg['fontSize'] as double?) ?? current.fontSize,
+                    bold: (cfg['bold'] as bool?) ?? current.bold,
+                    italic: (cfg['italic'] as bool?) ?? current.italic,
+                    opacity: (cfg['opacity'] as double?) ?? current.opacity,
                   );
                 });
+                FocusScope.of(ctx).unfocus();
               },
             ),
           ),
@@ -340,21 +468,20 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       },
     );
 
-    if (result != null) {
-      // Update existing text overlay
+    if (!mounted) return;
+    if (result != null && index >= 0 && index < _texts.length) {
       setState(() {
-        _texts[index] = _texts[index].copyWith(
-          color: result['color'] as Color? ?? overlay.color,
-          backgroundColor: result['bg'] as Color? ?? overlay.backgroundColor,
-          fontSize: (result['fontSize'] as double?) ?? overlay.fontSize,
-          bold: (result['bold'] as bool?) ?? overlay.bold,
-          italic: (result['italic'] as bool?) ?? overlay.italic,
-          opacity: (result['opacity'] as double?) ?? overlay.opacity,
+        final current = _texts[index];
+        _texts[index] = current.copyWith(
+          color: result['color'] as Color? ?? current.color,
+          backgroundColor: result['bg'] as Color? ?? current.backgroundColor,
+          fontSize: (result['fontSize'] as double?) ?? current.fontSize,
+          bold: (result['bold'] as bool?) ?? current.bold,
+          italic: (result['italic'] as bool?) ?? current.italic,
+          opacity: (result['opacity'] as double?) ?? current.opacity,
         );
       });
     }
-
-    setState(() {});
   }
 
   void _ensureOverlayVisible(int page, Offset pagePoint) {
@@ -378,7 +505,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     if (local != null) return local;
 
     // 2. Fallback: remove.bg (you need a free API key from https://remove.bg)
-    const apiKey = 'mgk2f3PTHLCg8SrArLNxm6sL';
+    const apiKey = '6uEBCBVFs6iZ6hrSX4f9ZV2T';
 
     // Try up to 2 attempts with longer timeout
     for (int attempt = 1; attempt <= 2; attempt++) {
@@ -583,16 +710,14 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
   // ---------------- place text on tap ----------------
   void _onViewerTap(TapUpDetails details) {
+    if (_editingTextIndex != null && !_awaitingTextPlacement) {
+      _stopInlineEditing();
+    }
     final localPos = _getLocalPosition(details.globalPosition);
     if (localPos == null) return;
 
     if (_selectedTool == lc.t('text') && _awaitingTextPlacement) {
-      _showAddTextDialog(localPos);
-      // after adding one text overlay, keep placement off so user can choose again via bottom sheet
-      setState(() {
-        _awaitingTextPlacement = false;
-        // keep _selectedTool == 'text' so draggable UI remains active; user must press Save to flatten
-      });
+      _placeTextInline(localPos);
     } else if (_selectedTool == 'comment' && _awaitingCommentPlacement) {
       _showAddCommentDialog(localPos);
       // after adding one comment, keep placement off so user can choose again via bottom sheet
@@ -609,77 +734,32 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     return box.globalToLocal(global);
   }
 
-  Future<void> _showAddTextDialog(Offset pos) async {
-    final TextEditingController tc = TextEditingController();
+  Future<void> _placeTextInline(Offset pos) async {
+    if (_pageSizes.isEmpty) {
+      await _loadPageSizes();
+    }
 
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(lc.t('addText')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: tc,
-                style: Theme.of(context).textTheme.titleSmall,
-                decoration: InputDecoration(
-                  hintText: lc.t('typeText'),
-                  hintStyle: Theme.of(context).textTheme.titleSmall,
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                setState(() {
-                  _awaitingTextPlacement = false;
-                  _selectedTool = '';
-                });
-              },
-              child: Text(lc.t('cancel')),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final text = tc.text.trim();
-                if (text.isEmpty) return;
-                Navigator.pop(ctx);
-
-                if (_pageSizes.isEmpty) {
-                  await _loadPageSizes();
-                }
-                final hit = _localToPage(pos);
-
-                // Add text with default styling, then open edit sheet
-                final newIndex = _texts.length;
-                final overlay = TextOverlay(
-                  pageNumber: hit.page,
-                  text: text,
-                  color: Colors.black,
-                  fontSize: 18,
-                  backgroundColor: Colors.transparent,
-                  bold: false,
-                  italic: false,
-                  opacity: 1.0,
-                  pageOffset: hit.pagePoint,
-                );
-                setState(() {
-                  _texts.add(overlay);
-                  _awaitingTextPlacement = false;
-                });
-
-                // Now open edit sheet to configure styling
-                await _openEditSheetForText(newIndex);
-              },
-              child: Text(lc.t('add')),
-            ),
-          ],
-        );
-      },
+    final hit = _localToPage(pos);
+    final overlay = TextOverlay(
+      pageNumber: hit.page,
+      text: '',
+      color: _selectedColor,
+      fontSize: _selectedFontSize,
+      backgroundColor: _selectedBgColor,
+      bold: _selectedBold,
+      italic: _selectedItalic,
+      opacity: _selectedOpacity,
+      pageOffset: hit.pagePoint,
     );
+
+    final newIndex = _texts.length;
+    setState(() {
+      _texts.add(overlay);
+      _awaitingTextPlacement = false;
+      _selectedTool = lc.t('text');
+    });
+
+    _startEditingText(newIndex);
   }
 
   // ---------------- drag & edit overlays ----------------
@@ -689,8 +769,64 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     });
   }
 
+  void _startEditingText(int index) {
+    if (index < 0 || index >= _texts.length) return;
+    setState(() {
+      _editingTextIndex = index;
+    });
+    final overlay = _texts[index];
+    _ensureOverlayVisible(overlay.pageNumber, overlay.pageOffset);
+  }
+
+  void _stopInlineEditing({bool removeIfEmpty = true}) {
+    final activeIndex = _editingTextIndex;
+    if (activeIndex != null) {
+      _finishEditingText(activeIndex, removeIfEmpty: removeIfEmpty);
+    }
+    FocusScope.of(context).unfocus();
+  }
+
+  void _updateTextContent(int index, String value) {
+    if (index < 0 || index >= _texts.length) return;
+    setState(() {
+      _texts[index] = _texts[index].copyWith(text: value);
+    });
+  }
+
+  void _finishEditingText(int index, {bool removeIfEmpty = true}) {
+    if (_editingTextIndex != index) {
+      return;
+    }
+    setState(() {
+      if (index >= 0 && index < _texts.length) {
+        final trimmed = _texts[index].text.trim();
+        if (trimmed.isEmpty && removeIfEmpty) {
+          _texts.removeAt(index);
+        }
+      }
+      _editingTextIndex = null;
+    });
+    FocusScope.of(context).unfocus();
+  }
+
+  void _updateDraftTextPosition(Offset newPageOffset) {
+    if (_draftText == null) return;
+    setState(() {
+      _draftText = _draftText!.copyWith(pageOffset: newPageOffset);
+    });
+  }
+
   void _removeText(int index) {
-    setState(() => _texts.removeAt(index));
+    setState(() {
+      _texts.removeAt(index);
+      if (_editingTextIndex != null) {
+        if (_editingTextIndex == index) {
+          _editingTextIndex = null;
+        } else if (_editingTextIndex! > index) {
+          _editingTextIndex = _editingTextIndex! - 1;
+        }
+      }
+    });
   }
 
   void _updateImagePosition(int index, Offset newPageOffset) {
@@ -997,12 +1133,19 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
             (255 * t.opacity).round(),
           ),
         );
+        if (t.opacity < 1.0) {
+          page.graphics.save();
+          page.graphics.setTransparency(t.opacity);
+        }
         page.graphics.drawString(
           t.text,
           font,
           brush: brush,
           bounds: Rect.fromLTWH(pdfX, pdfY, 500, 200),
         );
+        if (t.opacity < 1.0) {
+          page.graphics.restore();
+        }
       }
 
       // Apply images (signatures)
@@ -1147,6 +1290,12 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: widget.isedit
+          ? FloatingActionButton(
+              onPressed: _openEditSheet,
+              child: const Icon(Icons.edit, color: Colors.white),
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -1283,6 +1432,25 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                         onUpdatePageOffset: (o) => _updateTextPosition(i, o),
                         onDelete: () => _removeText(i),
                         onTap: () => _openEditSheetForText(i),
+                        onStartEditing: () => _startEditingText(i),
+                        onTextChanged: (value) => _updateTextContent(i, value),
+                        onEditingComplete: () => _finishEditingText(i),
+                        isEditing: _editingTextIndex == i,
+                      ),
+
+                    // ----- live draft text overlay -----
+                    if (_draftText != null)
+                      DraggableText(
+                        overlay: _draftText!,
+                        pageToLocal: _pageToLocal,
+                        effectiveScaleForPage: _effectiveScaleForPage,
+                        onUpdatePageOffset: _updateDraftTextPosition,
+                        onDelete: () => setState(() => _draftText = null),
+                        onTap: () {},
+                        onStartEditing: () {},
+                        onTextChanged: (_) {},
+                        onEditingComplete: () {},
+                        isEditing: false,
                       ),
 
                     // ----- signature overlays (now resizable) -----

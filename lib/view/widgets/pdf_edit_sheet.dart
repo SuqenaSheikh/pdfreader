@@ -12,6 +12,8 @@ class PdfEditSheet extends StatefulWidget {
   final double initialOpacity;
   final void Function(Map<String, dynamic> cfg)? onLiveChange;
   final bool showTextOptions;
+  final String initialText;
+  final bool showTextInput;
 
   PdfEditSheet({
     super.key,
@@ -23,6 +25,8 @@ class PdfEditSheet extends StatefulWidget {
     required this.initialOpacity,
     this.onLiveChange,
     this.showTextOptions = true,
+    this.initialText = '',
+    this.showTextInput = true,
   });
 
   @override
@@ -39,6 +43,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   bool _italic = false;
   double _opacity = 1.0;
   final lc = Get.find<LocaleController>();
+  late final TextEditingController _textController;
 
   @override
   void initState() {
@@ -50,11 +55,13 @@ class _PdfEditSheetState extends State<PdfEditSheet>
     _bold = widget.initialBold;
     _italic = widget.initialItalic;
     _opacity = widget.initialOpacity;
+    _textController = TextEditingController(text: widget.initialText);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -106,7 +113,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
   );
 
   void _doneAsText() {
-    Navigator.of(context).pop({
+    final result = <String, dynamic>{
       'action': lc.t('text'),
       'color': _color,
       'bg': _bg,
@@ -114,7 +121,11 @@ class _PdfEditSheetState extends State<PdfEditSheet>
       'bold': _bold,
       'italic': _italic,
       'opacity': _opacity,
-    });
+    };
+    if (widget.showTextInput) {
+      result['textValue'] = _textController.text;
+    }
+    Navigator.of(context).pop(result);
   }
 
   void _doneAsSignature() {
@@ -177,6 +188,32 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                         padding: const EdgeInsets.all(12),
                         child: Column(
                           children: [
+                            if (widget.showTextInput) ...[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(lc.t('addText')),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _textController,
+                                decoration: InputDecoration(
+                                  hintText: lc.t('typeText'),
+                                ),
+                                onChanged: (v) {
+                                  widget.onLiveChange?.call({
+                                    'action': lc.t('text'),
+                                    'textValue': v,
+                                    'color': _color,
+                                    'bg': _bg,
+                                    'fontSize': _fontSize,
+                                    'bold': _bold,
+                                    'italic': _italic,
+                                    'opacity': _opacity,
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Text(lc.t('color')),
@@ -268,7 +305,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                                     onChanged: (v) {
                                       setState(() => _italic = v ?? false);
                                       widget.onLiveChange?.call({
-                                        'action': 'text',
+                                        'action': lc.t('text'),
                                         'color': _color,
                                         'bg': _bg,
                                         'fontSize': _fontSize,
@@ -293,7 +330,7 @@ class _PdfEditSheetState extends State<PdfEditSheet>
                                     onChanged: (v) {
                                       setState(() => _opacity = v);
                                       widget.onLiveChange?.call({
-                                        'action': 'text',
+                                        'action': lc.t('text'),
                                         'color': _color,
                                         'bg': _bg,
                                         'fontSize': _fontSize,

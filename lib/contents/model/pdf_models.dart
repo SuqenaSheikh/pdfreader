@@ -43,9 +43,10 @@ class TextOverlay {
     bool? bold,
     bool? italic,
     double? opacity,
+    String? text,
   }) => TextOverlay(
     pageNumber: pageNumber,
-    text: text,
+    text: text ?? this.text,
     color: color ?? this.color,
     fontSize: fontSize ?? this.fontSize,
     backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -83,6 +84,7 @@ class ImageOverlay {
     pageHeight: pageHeight ?? this.pageHeight,
   );
 }
+
 class CommentOverlay {
   final int pageNumber;
   final Offset pageOffset;
